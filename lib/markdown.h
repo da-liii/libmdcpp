@@ -1,12 +1,11 @@
-
 /*
 	Copyright (c) 2009 by Chad Nelson
 	Released under the MIT License.
 	See the provided LICENSE.TXT file for details.
 */
 
-#ifndef MARKDOWN_H_INCLUDED
-#define MARKDOWN_H_INCLUDED
+#ifndef LIBMDCPP_H_INCLUDED
+#define LIBMDCPP_H_INCLUDED
 
 #include <iostream>
 #include <string>
@@ -16,6 +15,8 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/optional.hpp>
 #include <boost/unordered_map.hpp>
+
+using std::string;
 
 namespace markdown {
 
@@ -38,19 +39,20 @@ namespace markdown {
 		// You can call read() functions multiple times before writing if
 		// desirable. Once the document has been processed for writing, it can't
 		// accept any more input.
-		bool read(const std::string&);
+		bool read(const string&);
 		bool read(std::istream&);
 		void write(std::ostream&);
 		void writeTokens(std::ostream&); // For debugging
 
 		// The class is marked noncopyable because it uses reference-counted
-		// links to things that get changed during processing. If you want to
+ 		// links to things that get changed during processing. If you want to
 		// copy it, use the `copy` function to explicitly say that.
 		Document copy() const; // TODO: Copy function not yet written.
 
 		private:
-		bool _getline(std::istream& in, std::string& line);
+		bool _getline(std::istream& in, string& line);
 		void _process();
+        void _processFencedBlocks();
 		void _mergeMultilineHtmlTags();
 		void _processInlineHtmlAndReferences();
 		void _processBlocksItems(TokenPtr inTokenContainer);
@@ -66,4 +68,4 @@ namespace markdown {
 
 } // namespace markdown
 
-#endif // MARKDOWN_H_INCLUDED
+#endif

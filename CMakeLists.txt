@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(libmarkdown-cpp)
+project(libmdcpp)
+
+set (CMAKE_CXX_FLAGS "-std=c++11")
 
 # set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost
@@ -10,3 +12,4 @@ find_package(Boost
 include_directories(${Boost_INCLUDE_DIRS})
 
 add_subdirectory(lib)
+add_subdirectory(test)
