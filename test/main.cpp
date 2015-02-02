@@ -14,7 +14,7 @@
 #include <boost/optional.hpp>
 //#include <boost/regex.hpp> // For the 'test' option
 
-#include "markdown.h"
+#include "../lib/markdown.h"
 
 using std::cerr;
 using std::cout;
@@ -128,7 +128,8 @@ int main(int argc, char *argv[]) {
 		} else in=&ifile;
 	} else cerr << "Reading standard input..." << endl;
 
-	markdown::Document doc;
+    markdown::SyntaxHighlighter highlighter;
+	markdown::Document doc(&highlighter);
 	doc.read(*in);
 
 	if (cfg.debug()) doc.writeTokens(cout);

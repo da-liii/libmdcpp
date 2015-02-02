@@ -8,4 +8,4 @@ set_target_properties(mdcpp PROPERTIES VERSION 1.0 SOVERSION 1)
 
 install(TARGETS mdcpp LIBRARY DESTINATION lib)
 
-install(FILES markdown.h markdown_tokens.h DESTINATION include)
+install(FILES markdown.h DESTINATION include)

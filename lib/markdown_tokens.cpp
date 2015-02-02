@@ -672,8 +672,18 @@ void CodeBlock::writeAsHtml(std::ostream& out) const {
 
 void FencedCodeBlock::writeAsHtml(std::ostream& out) const
 {
-    out << "<pre><code>";
-    TextHolder::writeAsHtml(out);
+    if (mInfoString.empty()) {
+        out << "<pre><code>";
+        TextHolder::writeAsHtml(out);
+    } else {
+        auto si = mInfoString.begin(), sie = mInfoString.end();
+        while (si!=sie && *si==' ') si++;
+        auto sii=si;
+        while (sii!=sie && *sii!=' ') sii++;
+        out << "<pre><code class=\"language-"+ string(si, sii) + "\">";
+        mHighlighter->highlight(*text(), string(si, sii), out);
+    }
+    
     out << "</code></pre>\n\n";
 }
 

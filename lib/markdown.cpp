@@ -284,25 +284,6 @@ bool isCodeFenceEndLine(const string& line, int indent, int openLen, char fence,
     return true;
 }
 
-optional<TokenPtr> parseFencedCodeBlock(CTokenGroupIter& i, CTokenGroupIter end) {
-    if (!(*i)->isBlankLine() && (*i)->text() && (*i)->canContainMarkup()) {
-        string info("");
-        std::ostringstream out;
-        int indent, length;
-        char fence;
-        if (!isCodeFenceBeginLine(*((*i)->text()), indent, length, fence, info))
-            return none;
-        ++i;
-        while (i!=end && !isCodeFenceEndLine(*((*i)->text()), indent, length, fence, out))
-            ++i;
-        // Unclosed code blocks are closed by the end of the document
-        if (i == end)
-            --i;
-        return TokenPtr(new markdown::token::FencedCodeBlock(out.str(), info));
-    }
-    return none;
-}
-
 size_t countQuoteLevel(const string& prefixString) {
 	size_t r=0;
 	for (string::const_iterator qi=prefixString.begin(),
@@ -678,16 +659,17 @@ string LinkIds::_scrubKey(string str) {
 const size_t Document::cSpacesPerInitialTab=4; // Required by Markdown format
 const size_t Document::cDefaultSpacesPerTab=cSpacesPerInitialTab;
 
-Document::Document(size_t spacesPerTab): cSpacesPerTab(spacesPerTab),
+Document::Document(SyntaxHighlighter *highlighter, size_t spacesPerTab)
+    : cSpacesPerTab(spacesPerTab),
 	mTokenContainer(new token::Container), mIdTable(new LinkIds),
-	mProcessed(false)
+	mProcessed(false), mHighlighter(highlighter)
 {
 	// This space deliberately blank ;-)
 }
 
-Document::Document(std::istream& in, size_t spacesPerTab):
-	cSpacesPerTab(spacesPerTab), mTokenContainer(new token::Container),
-	mIdTable(new LinkIds), mProcessed(false)
+Document::Document(std::istream& in, SyntaxHighlighter *highlighter, size_t spacesPerTab)
+    : cSpacesPerTab(spacesPerTab), mTokenContainer(new token::Container),
+	mIdTable(new LinkIds), mProcessed(false), mHighlighter(highlighter)
 {
 	read(in);
 }
@@ -767,6 +749,25 @@ void Document::_process() {
 		mTokenContainer->processSpanElements(*mIdTable);
 		mProcessed=true;
 	}
+}
+
+optional<TokenPtr> Document::parseFencedCodeBlock(CTokenGroupIter& i, CTokenGroupIter end) {
+    if (!(*i)->isBlankLine() && (*i)->text() && (*i)->canContainMarkup()) {
+        string info("");
+        std::ostringstream out;
+        int indent, length;
+        char fence;
+        if (!isCodeFenceBeginLine(*((*i)->text()), indent, length, fence, info))
+            return none;
+        ++i;
+        while (i!=end && !isCodeFenceEndLine(*((*i)->text()), indent, length, fence, out))
+            ++i;
+        // Unclosed code blocks are closed by the end of the document
+        if (i == end)
+            --i;
+        return TokenPtr(new markdown::token::FencedCodeBlock(out.str(), info, mHighlighter));
+    }
+    return none;
 }
 
 void Document::_processFencedBlocks() {

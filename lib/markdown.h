@@ -29,11 +29,19 @@ namespace markdown {
 
 	typedef boost::shared_ptr<Token> TokenPtr;
 	typedef std::list<TokenPtr> TokenGroup;
+    typedef TokenGroup::const_iterator CTokenGroupIter;
+    
+    class SyntaxHighlighter {
+    public:
+        SyntaxHighlighter() {}
+        virtual ~SyntaxHighlighter() {}
+        virtual void highlight(const string& code, const string lang, std::ostream& out) { out << code; }
+    };
 
 	class Document: private boost::noncopyable {
 		public:
-		Document(size_t spacesPerTab=cDefaultSpacesPerTab);
-		Document(std::istream& in, size_t spacesPerTab=cDefaultSpacesPerTab);
+		Document(SyntaxHighlighter* highlighter, size_t spacesPerTab=cDefaultSpacesPerTab);
+		Document(std::istream& in, SyntaxHighlighter* highlighter, size_t spacesPerTab=cDefaultSpacesPerTab);
 		~Document();
 
 		// You can call read() functions multiple times before writing if
@@ -53,6 +61,7 @@ namespace markdown {
 		bool _getline(std::istream& in, string& line);
 		void _process();
         void _processFencedBlocks();
+        optional<TokenPtr> parseFencedCodeBlock(CTokenGroupIter& i, CTokenGroupIter end);
 		void _mergeMultilineHtmlTags();
 		void _processInlineHtmlAndReferences();
 		void _processBlocksItems(TokenPtr inTokenContainer);
@@ -64,6 +73,7 @@ namespace markdown {
 		TokenPtr mTokenContainer;
 		LinkIds *mIdTable;
 		bool mProcessed;
+        SyntaxHighlighter *mHighlighter;
 	};
 
 } // namespace markdown

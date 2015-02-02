@@ -15,7 +15,6 @@
 namespace markdown {
 
 typedef TokenGroup::iterator TokenGroupIter;
-typedef TokenGroup::const_iterator CTokenGroupIter;
 
 class LinkIds {
 	public:
@@ -165,13 +164,16 @@ class CodeBlock: public TextHolder {
 
 class FencedCodeBlock: public TextHolder {
 public:
-    FencedCodeBlock(const string& actualContents, const string& info): TextHolder(actualContents,
-        false, cDoubleAmps|cAngles|cQuotes) { infoString = info; }
+    FencedCodeBlock(const string& actualContents, const string& info, SyntaxHighlighter *highlighter)
+        : TextHolder(actualContents, false, cDoubleAmps|cAngles|cQuotes)
+        , mInfoString(info)
+        , mHighlighter(highlighter) { }
     virtual void writeAsHtml(std::ostream& out) const;
     
     virtual void writeToken(std::ostream& out) const { out << "FencedCodeBlock: " << *text() << "\n"; }
 private:
-    string infoString;
+    const string mInfoString;
+    SyntaxHighlighter *mHighlighter;
 };
 
 class CodeSpan: public TextHolder {
