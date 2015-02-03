@@ -596,25 +596,30 @@ void flushParagraph(string& paragraphText, markdown::TokenGroup&
 optional<TokenPtr> parseHeader(CTokenGroupIter& i, CTokenGroupIter end) {
 	if (!(*i)->isBlankLine() && (*i)->text() && (*i)->canContainMarkup()) {
 		// Hash-mark type
-		static const boost::regex cHashHeaders("^(#{1,6}) +(.*?) *#*$");
+		static const boost::regex cHashHeaders("^ {0,3}(#{1,6}) +(.*?)( +#* *)?$");
 		const string& line=*(*i)->text();
-		boost::smatch m;
-		if (boost::regex_match(line, m, cHashHeaders)) {
+		boost::smatch m1, m2;
+		if (boost::regex_match(line, m1, cHashHeaders)) {
             markdown::TokenGroup g;
-            g.push_back(TokenPtr(new markdown::token::RawText(m[2])));
-			return TokenPtr(new markdown::token::Header(m[1].length(), g));
+            g.push_back(TokenPtr(new markdown::token::RawText(m1[2])));
+			return TokenPtr(new markdown::token::Header(m1[1].length(), g));
         }
 
 		// Underlined type
 		CTokenGroupIter ii=i;
 		++ii;
 		if (ii!=end && !(*ii)->isBlankLine() && (*ii)->text() && (*ii)->canContainMarkup()) {
-			static const boost::regex cUnderlinedHeaders("^([-=])\\1*$");
+			static const boost::regex cUnderlinedHeaders("^ {0,3}([-=])\\1* *$");
+            static const boost::regex titleWithSpaces("^ {0,3}(.*)");
 			const string& line=*(*ii)->text();
-			if (boost::regex_match(line, m, cUnderlinedHeaders)) {
-				char typeChar=string(m[1])[0];
+            const string& title=*(*i)->text();
+			if (boost::regex_match(line, m1, cUnderlinedHeaders)) {
+				char typeChar=string(m1[1])[0];
+                boost::regex_match(title, m2, titleWithSpaces);
                 markdown::TokenGroup g;
-                g.push_back(TokenPtr(new markdown::token::RawText(*(*i)->text())));
+                const string& titleWithTS = string(m2[1]);
+                auto se = titleWithTS.find_last_not_of(" ")+1;
+                g.push_back(TokenPtr(new markdown::token::RawText(titleWithTS.substr(0, se))));
                 TokenPtr p=TokenPtr(new markdown::token::Header((typeChar=='='? 1 : 2), g));
 				i=ii;
 				return p;
