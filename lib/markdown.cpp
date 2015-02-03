@@ -622,10 +622,10 @@ optional<TokenPtr> parseHeader(CTokenGroupIter& i, CTokenGroupIter end) {
 
 optional<TokenPtr> parseHorizontalRule(CTokenGroupIter& i, CTokenGroupIter end) {
 	if (!(*i)->isBlankLine() && (*i)->text() && (*i)->canContainMarkup()) {
-		static const boost::regex cHorizontalRules("^ {0,3}((?:-|\\*|_) *){3,}$");
+		static const boost::regex cHorizontalRules("^ {0,3}((\\* *){3,}|(- *){3,}|(_ *){3,})$");
 		const string& line=*(*i)->text();
 		if (boost::regex_match(line, cHorizontalRules)) {
-			return TokenPtr(new markdown::token::HtmlTag("hr/"));
+			return TokenPtr(new markdown::token::HtmlTag("hr /"));
 		}
 	}
 	return none;
