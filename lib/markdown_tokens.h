@@ -186,23 +186,7 @@ class CodeSpan: public TextHolder {
 	virtual void writeToken(std::ostream& out) const { out << "CodeSpan: " << *text() << '\n'; }
 };
 
-class Header: public TextHolder {
-	public:
-	Header(size_t level, const string& text): TextHolder(text, true,
-		cAmps|cAngles|cQuotes), mLevel(level) { }
 
-	virtual void writeToken(std::ostream& out) const { out << "Header " <<
-		mLevel << ": " << *text() << '\n'; }
-
-	virtual bool inhibitParagraphs() const { return true; }
-
-	protected:
-	virtual void preWrite(std::ostream& out) const { out << "<h" << mLevel << ">"; }
-	virtual void postWrite(std::ostream& out) const { out << "</h" << mLevel << ">\n"; }
-
-	private:
-	size_t mLevel;
-};
 
 class BlankLine: public TextHolder {
 	public:
@@ -275,6 +259,26 @@ class InlineHtmlBlock: public Container {
 
 	private:
 	bool mIsBlockTag;
+};
+
+class Header: public Container {
+    public:
+    Header(size_t level, const TokenGroup& content): Container(content), mLevel(level) { }
+
+    //virtual void writeToken(std::ostream& out) const override { out << "Header " <<
+    //    mLevel << ": " << *text() << '\n'; }
+
+    virtual bool inhibitParagraphs() const override { return true; }
+    
+    virtual TokenPtr clone(const TokenGroup& newContents) const { return TokenPtr(new Header(mLevel, newContents)); }
+    virtual string containerName() const { return "Header"; }
+
+    protected:
+    virtual void preWrite(std::ostream& out) const override { out << "<h" << mLevel << ">"; }
+    virtual void postWrite(std::ostream& out) const override { out << "</h" << mLevel << ">\n"; }
+
+    private:
+    size_t mLevel;
 };
 
 class ListItem: public Container {

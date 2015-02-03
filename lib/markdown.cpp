@@ -599,8 +599,11 @@ optional<TokenPtr> parseHeader(CTokenGroupIter& i, CTokenGroupIter end) {
 		static const boost::regex cHashHeaders("^(#{1,6}) +(.*?) *#*$");
 		const string& line=*(*i)->text();
 		boost::smatch m;
-		if (boost::regex_match(line, m, cHashHeaders))
-			return TokenPtr(new markdown::token::Header(m[1].length(), m[2]));
+		if (boost::regex_match(line, m, cHashHeaders)) {
+            markdown::TokenGroup g;
+            g.push_back(TokenPtr(new markdown::token::RawText(m[2])));
+			return TokenPtr(new markdown::token::Header(m[1].length(), g));
+        }
 
 		// Underlined type
 		CTokenGroupIter ii=i;
@@ -610,8 +613,9 @@ optional<TokenPtr> parseHeader(CTokenGroupIter& i, CTokenGroupIter end) {
 			const string& line=*(*ii)->text();
 			if (boost::regex_match(line, m, cUnderlinedHeaders)) {
 				char typeChar=string(m[1])[0];
-				TokenPtr p=TokenPtr(new markdown::token::Header((typeChar=='='
-					? 1 : 2), *(*i)->text()));
+                markdown::TokenGroup g;
+                g.push_back(TokenPtr(new markdown::token::RawText(*(*i)->text())));
+                TokenPtr p=TokenPtr(new markdown::token::Header((typeChar=='='? 1 : 2), g));
 				i=ii;
 				return p;
 			}
