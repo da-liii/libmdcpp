@@ -8,13 +8,17 @@
 #include "markdown_tokens.h"
 
 #include <stack>
+#include <regex>
+#include <unordered_set>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/regex.hpp>
-#include <boost/unordered_set.hpp>
 
 using std::cerr;
 using std::endl;
+using std::regex;
+using std::smatch;
+using std::regex_match;
+using std::unordered_set;
 
 namespace markdown {
 namespace token {
@@ -24,160 +28,166 @@ namespace {
 const string cEscapedCharacters("\\`*_{}[]()#+-.!>");
 
 optional<size_t> isEscapedCharacter(char c) {
-	string::const_iterator i=std::find(cEscapedCharacters.begin(),
-		cEscapedCharacters.end(), c);
-	if (i!=cEscapedCharacters.end())
-		return std::distance(cEscapedCharacters.begin(), i);
-	else return none;
+    string::const_iterator i=std::find(cEscapedCharacters.begin(),
+                                       cEscapedCharacters.end(), c);
+    if (i!=cEscapedCharacters.end())
+        return std::distance(cEscapedCharacters.begin(), i);
+    else return none;
 }
 
 char escapedCharacter(size_t index) {
-	return cEscapedCharacters[index];
+    return cEscapedCharacters[index];
 }
 
 string encodeString(const string& src, int encodingFlags) {
-	bool amps=(encodingFlags & cAmps)!=0,
-		doubleAmps=(encodingFlags & cDoubleAmps)!=0,
-		angleBrackets=(encodingFlags & cAngles)!=0,
-		quotes=(encodingFlags & cQuotes)!=0;
+    bool amps=(encodingFlags & cAmps)!=0,
+         doubleAmps=(encodingFlags & cDoubleAmps)!=0,
+         angleBrackets=(encodingFlags & cAngles)!=0,
+         quotes=(encodingFlags & cQuotes)!=0;
 
-	string tgt;
-	for (string::const_iterator i=src.begin(), ie=src.end(); i!=ie; ++i) {
-		if (*i=='&' && amps) {
-			static const boost::regex cIgnore("^(&amp;)|(&#[0-9]{1,3};)|(&#[xX][0-9a-fA-F]{1,2};)");
-			if (boost::regex_search(i, ie, cIgnore)) {
-				tgt.push_back(*i);
-			} else {
-				tgt+="&amp;";
-			}
-		}
-		else if (*i=='&' && doubleAmps) tgt+="&amp;";
-		else if (*i=='<' && angleBrackets) tgt+="&lt;";
-		else if (*i=='>' && angleBrackets) tgt+="&gt;";
-		else if (*i=='\"' && quotes) tgt+="&quot;";
-		else tgt.push_back(*i);
-	}
-	return tgt;
+    string tgt;
+    for (string::const_iterator i=src.begin(), ie=src.end(); i!=ie; ++i) {
+        if (*i=='&' && amps) {
+            static const regex cIgnore("^(&amp;)|(&#[0-9]{1,3};)|(&#[xX][0-9a-fA-F]{1,2};)");
+            if (regex_search(i, ie, cIgnore)) {
+                tgt.push_back(*i);
+            } else {
+                tgt+="&amp;";
+            }
+        }
+        else if (*i=='&' && doubleAmps) tgt+="&amp;";
+        else if (*i=='<' && angleBrackets) tgt+="&lt;";
+        else if (*i=='>' && angleBrackets) tgt+="&gt;";
+        else if (*i=='\"' && quotes) tgt+="&quot;";
+        else tgt.push_back(*i);
+    }
+    return tgt;
 }
 
 bool looksLikeUrl(const string& str) {
-	const char *schemes[]={ "http://", "https://", "ftp://", "ftps://",
-		"file://", "www.", "ftp.", 0 };
-	for (size_t x=0; schemes[x]!=0; ++x) {
-		const char *s=str.c_str(), *t=schemes[x];
-		while (*s!=0 && *t!=0 && *s==*t) { ++s; ++t; }
-		if (*t==0) return true;
-	}
-	return false;
+    const char *schemes[]= { "http://", "https://", "ftp://", "ftps://",
+                             "file://", "www.", "ftp.", 0
+                           };
+    for (size_t x=0; schemes[x]!=0; ++x) {
+        const char *s=str.c_str(), *t=schemes[x];
+        while (*s!=0 && *t!=0 && *s==*t) {
+            ++s;
+            ++t;
+        }
+        if (*t==0) return true;
+    }
+    return false;
 }
 
 bool notValidNameCharacter(char c) {
-	return !(isalnum(c) || c=='.' || c=='_' || c=='%' || c=='-' || c=='+');
+    return !(isalnum(c) || c=='.' || c=='_' || c=='%' || c=='-' || c=='+');
 }
 
 bool notValidSiteCharacter(char c) {
-	// NOTE: Kludge alert! The official spec for site characters is only
-	// "a-zA-Z._%-". However, MDTest supports "international domain names,"
-	// which use characters other than that; I'm kind of cheating here, handling
-	// those by allowing all utf8-encoded characters too.
-	return !(isalnum(c) || c=='.' || c=='_' || c=='%' || c=='-' || (c & 0x80));
+    // NOTE: Kludge alert! The official spec for site characters is only
+    // "a-zA-Z._%-". However, MDTest supports "international domain names,"
+    // which use characters other than that; I'm kind of cheating here, handling
+    // those by allowing all utf8-encoded characters too.
+    return !(isalnum(c) || c=='.' || c=='_' || c=='%' || c=='-' || (c & 0x80));
 }
 
 bool isNotAlpha(char c) {
-	return !isalpha(c);
+    return !isalpha(c);
 }
 
 string emailEncode(const string& src) {
-	std::ostringstream out;
-	bool inHex=false;
-	for (string::const_iterator i=src.begin(), ie=src.end(); i!=ie;
-		++i)
-	{
-		if (*i & 0x80) out << *i;
-		else if (inHex) {
-			out << "&#x" << std::hex << static_cast<int>(*i) << ';';
-		} else {
-			out << "&#" << std::dec << static_cast<int>(*i) << ';';
-		}
-		inHex=!inHex;
-	}
-	return out.str();
+    std::ostringstream out;
+    bool inHex=false;
+    for (string::const_iterator i=src.begin(), ie=src.end(); i!=ie;
+            ++i)
+    {
+        if (*i & 0x80) out << *i;
+        else if (inHex) {
+            out << "&#x" << std::hex << static_cast<int>(*i) << ';';
+        } else {
+            out << "&#" << std::dec << static_cast<int>(*i) << ';';
+        }
+        inHex=!inHex;
+    }
+    return out.str();
 }
 
 bool looksLikeEmailAddress(const string& str) {
-	typedef string::const_iterator Iter;
-	typedef string::const_reverse_iterator RIter;
-	Iter i=std::find_if(str.begin(), str.end(), notValidNameCharacter);
-	if (i!=str.end() && *i=='@' && i!=str.begin()) {
-		// The name part is valid.
-		i=std::find_if(i+1, str.end(), notValidSiteCharacter);
-		if (i==str.end()) {
-			// The site part doesn't contain any invalid characters.
-			RIter ri=std::find_if(str.rbegin(), str.rend(), isNotAlpha);
-			if (ri!=str.rend() && *ri=='.') {
-				// It ends with a dot and only alphabetic characters.
-				size_t d=std::distance(ri.base(), str.end());
-				if (d>=2 && d<=4) {
-					// There are two-to-four of them. It's valid.
-					return true;
-				}
-			}
-		}
-	}
-	return false;
+    typedef string::const_iterator Iter;
+    typedef string::const_reverse_iterator RIter;
+    Iter i=std::find_if(str.begin(), str.end(), notValidNameCharacter);
+    if (i!=str.end() && *i=='@' && i!=str.begin()) {
+        // The name part is valid.
+        i=std::find_if(i+1, str.end(), notValidSiteCharacter);
+        if (i==str.end()) {
+            // The site part doesn't contain any invalid characters.
+            RIter ri=std::find_if(str.rbegin(), str.rend(), isNotAlpha);
+            if (ri!=str.rend() && *ri=='.') {
+                // It ends with a dot and only alphabetic characters.
+                size_t d=std::distance(ri.base(), str.end());
+                if (d>=2 && d<=4) {
+                    // There are two-to-four of them. It's valid.
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 // From <http://en.wikipedia.org/wiki/HTML_element>
 
-const char *cOtherTagInit[]={
-	// Header tags
-	"title/", "base", "link", "basefont", "script/", "style/",
-	"object/", "meta",
+const char *cOtherTagInit[]= {
+    // Header tags
+    "title/", "base", "link", "basefont", "script/", "style/",
+    "object/", "meta",
 
-	// Inline tags
-	"em/", "strong/", "q/", "cite/", "dfn/", "abbr/", "acronym/",
-	"code/", "samp/", "kbd/", "var/", "sub/", "sup/", "del/", "ins/",
-	"isindex", "a/", "img", "br", "map/", "area", "object/", "param",
-	"applet/", "span/",
+    // Inline tags
+    "em/", "strong/", "q/", "cite/", "dfn/", "abbr/", "acronym/",
+    "code/", "samp/", "kbd/", "var/", "sub/", "sup/", "del/", "ins/",
+    "isindex", "a/", "img", "br", "map/", "area", "object/", "param",
+    "applet/", "span/",
 
-	0 };
+    0
+};
 
-const char *cBlockTagInit[]={ "p/", "blockquote/", "hr", "h1/", "h2/",
-	"h3/", "h4/", "h5/", "h6/", "dl/", "dt/", "dd/", "ol/", "ul/",
-	"li/", "dir/", "menu/", "table/", "tr/", "th/", "td/", "col",
-	"colgroup/", "caption/", "thead/", "tbody/", "tfoot/", "form/",
-	"select/", "option", "input", "label/", "textarea/", "div/", "pre/",
-	"address/", "iframe/", "frame/", "frameset/", "noframes/",
-	"center/", "b/", "i/", "big/", "small/", /*"s/",*/ "strike/", "tt/",
-	"u/", "font/", "ins/", "del/", 0 };
+const char *cBlockTagInit[]= { "p/", "blockquote/", "hr", "h1/", "h2/",
+                               "h3/", "h4/", "h5/", "h6/", "dl/", "dt/", "dd/", "ol/", "ul/",
+                               "li/", "dir/", "menu/", "table/", "tr/", "th/", "td/", "col",
+                               "colgroup/", "caption/", "thead/", "tbody/", "tfoot/", "form/",
+                               "select/", "option", "input", "label/", "textarea/", "div/", "pre/",
+                               "address/", "iframe/", "frame/", "frameset/", "noframes/",
+                               "center/", "b/", "i/", "big/", "small/", /*"s/",*/ "strike/", "tt/",
+                               "u/", "font/", "ins/", "del/", 0
+                             };
 
 // Other official ones (not presently in use in this code)
 //"!doctype", "bdo", "body", "button", "fieldset", "head", "html",
 //"legend", "noscript", "optgroup", "xmp",
 
-boost::unordered_set<string> otherTags, blockTags;
+unordered_set<string> otherTags, blockTags;
 
-void initTag(boost::unordered_set<string> &set, const char *init[]) {
-	for (size_t x=0; init[x]!=0; ++x) {
-		string str=init[x];
-		if (*str.rbegin()=='/') {
-			// Means it can have a closing tag
-			str=str.substr(0, str.length()-1);
-		}
-		set.insert(str);
-	}
+void initTag(unordered_set<string> &set, const char *init[]) {
+    for (size_t x=0; init[x]!=0; ++x) {
+        string str=init[x];
+        if (*str.rbegin()=='/') {
+            // Means it can have a closing tag
+            str=str.substr(0, str.length()-1);
+        }
+        set.insert(str);
+    }
 }
 
 string cleanTextLinkRef(const string& ref) {
-	string r;
-	for (string::const_iterator i=ref.begin(), ie=ref.end(); i!=ie;
-		++i)
-	{
-		if (*i==' ') {
-			if (r.empty() || *r.rbegin()!=' ') r.push_back(' ');
-		} else r.push_back(*i);
-	}
-	return r;
+    string r;
+    for (string::const_iterator i=ref.begin(), ie=ref.end(); i!=ie;
+            ++i)
+    {
+        if (*i==' ') {
+            if (r.empty() || *r.rbegin()!=' ') r.push_back(' ');
+        } else r.push_back(*i);
+    }
+    return r;
 }
 
 } // namespace
@@ -185,489 +195,493 @@ string cleanTextLinkRef(const string& ref) {
 
 
 size_t isValidTag(const string& tag, bool nonBlockFirst) {
-	if (blockTags.empty()) {
-		initTag(otherTags, cOtherTagInit);
-		initTag(blockTags, cBlockTagInit);
-	}
+    if (blockTags.empty()) {
+        initTag(otherTags, cOtherTagInit);
+        initTag(blockTags, cBlockTagInit);
+    }
 
-	if (nonBlockFirst) {
-		if (otherTags.find(tag)!=otherTags.end()) return 1;
-		if (blockTags.find(tag)!=blockTags.end()) return 2;
-	} else {
-		if (blockTags.find(tag)!=blockTags.end()) return 2;
-		if (otherTags.find(tag)!=otherTags.end()) return 1;
-	}
-	return 0;
+    if (nonBlockFirst) {
+        if (otherTags.find(tag)!=otherTags.end()) return 1;
+        if (blockTags.find(tag)!=blockTags.end()) return 2;
+    } else {
+        if (blockTags.find(tag)!=blockTags.end()) return 2;
+        if (otherTags.find(tag)!=otherTags.end()) return 1;
+    }
+    return 0;
 }
 
 
 
 void TextHolder::writeAsHtml(std::ostream& out) const {
-	preWrite(out);
-	if (mEncodingFlags!=0) {
-		out << encodeString(mText, mEncodingFlags);
-	} else {
-		out << mText;
-	}
-	postWrite(out);
+    preWrite(out);
+    if (mEncodingFlags!=0) {
+        out << encodeString(mText, mEncodingFlags);
+    } else {
+        out << mText;
+    }
+    postWrite(out);
 }
 
 optional<TokenGroup> RawText::processSpanElements(const LinkIds& idTable) {
-	if (!canContainMarkup()) return none;
+    if (!canContainMarkup()) return none;
 
-	ReplacementTable replacements;
-	string str=_processHtmlTagAttributes(*text(), replacements);
-	str=_processCodeSpans(str, replacements);
-	str=_processEscapedCharacters(str);
-	str=_processLinksImagesAndTags(str, replacements, idTable);
-	return _processBoldAndItalicSpans(str, replacements);
+    ReplacementTable replacements;
+    string str=_processHtmlTagAttributes(*text(), replacements);
+    str=_processCodeSpans(str, replacements);
+    str=_processEscapedCharacters(str);
+    str=_processLinksImagesAndTags(str, replacements, idTable);
+    return _processBoldAndItalicSpans(str, replacements);
 }
 
 string RawText::_processHtmlTagAttributes(string src, ReplacementTable&
-	replacements)
+        replacements)
 {
-	// Because "Attribute Content Is Not A Code Span"
-	string tgt;
-	string::const_iterator prev=src.begin(), end=src.end();
-	while (1) {
-		static const boost::regex cHtmlToken("<((/?)([a-zA-Z0-9]+)(?:( +[a-zA-Z0-9]+?(?: ?= ?(\"|').*?\\5))+? */? *))>");
-		boost::smatch m;
-		if (boost::regex_search(prev, end, m, cHtmlToken)) {
-			// NOTE: Kludge alert! The `isValidTag` test is a cheat, only here
-			// to handle some edge cases between the Markdown test suite and the
-			// PHP-Markdown one, which seem to conflict.
-			if (isValidTag(m[3])) {
-				tgt+=string(prev, m[0].first);
+    // Because "Attribute Content Is Not A Code Span"
+    string tgt;
+    string::const_iterator prev=src.begin(), end=src.end();
+    while (1) {
+        static const regex cHtmlToken("<((/?)([a-zA-Z0-9]+)(?:( +[a-zA-Z0-9]+?(?: ?= ?(\"|').*?\\5))+? */? *))>");
+        smatch m;
+        if (regex_search(prev, end, m, cHtmlToken)) {
+            // NOTE: Kludge alert! The `isValidTag` test is a cheat, only here
+            // to handle some edge cases between the Markdown test suite and the
+            // PHP-Markdown one, which seem to conflict.
+            if (isValidTag(m[3])) {
+                tgt+=string(prev, m[0].first);
 
-				string fulltag=m[0], tgttag;
-				string::const_iterator prevtag=fulltag.begin(), endtag=fulltag.end();
-				while (1) {
-					static const boost::regex cAttributeStrings("= ?(\"|').*?\\1");
-					boost::smatch mtag;
-					if (boost::regex_search(prevtag, endtag, mtag, cAttributeStrings)) {
-						tgttag+=string(prevtag, mtag[0].first);
-						tgttag+="\x01@"+boost::lexical_cast<string>(replacements.size())+"@htmlTagAttr\x01";
-						prevtag=mtag[0].second;
+                string fulltag=m[0], tgttag;
+                string::const_iterator prevtag=fulltag.begin(), endtag=fulltag.end();
+                while (1) {
+                    static const regex cAttributeStrings("= ?(\"|').*?\\1");
+                    smatch mtag;
+                    if (regex_search(prevtag, endtag, mtag, cAttributeStrings)) {
+                        tgttag+=string(prevtag, mtag[0].first);
+                        tgttag+="\x01@"+boost::lexical_cast<string>(replacements.size())+"@htmlTagAttr\x01";
+                        prevtag=mtag[0].second;
 
-						replacements.push_back(TokenPtr(new TextHolder(string(mtag[0]), false, cAmps|cAngles)));
-					} else {
-						tgttag+=string(prevtag, endtag);
-						break;
-					}
-				}
-				tgt+=tgttag;
-				prev=m[0].second;
-			} else {
-				tgt+=string(prev, m[0].second);
-				prev=m[0].second;
-			}
-		} else {
-			tgt+=string(prev, end);
-			break;
-		}
-	}
+                        replacements.push_back(TokenPtr(new TextHolder(string(mtag[0]), false, cAmps|cAngles)));
+                    } else {
+                        tgttag+=string(prevtag, endtag);
+                        break;
+                    }
+                }
+                tgt+=tgttag;
+                prev=m[0].second;
+            } else {
+                tgt+=string(prev, m[0].second);
+                prev=m[0].second;
+            }
+        } else {
+            tgt+=string(prev, end);
+            break;
+        }
+    }
 
-	return tgt;
+    return tgt;
 }
 
 string RawText::_processCodeSpans(string src, ReplacementTable&
-	replacements)
+                                  replacements)
 {
-	static const boost::regex cCodeSpan[2]={
-		boost::regex("(?:^|(?<=[^\\\\]))`` (.+?) ``"),
-		boost::regex("(?:^|(?<=[^\\\\]))`(.+?)`")
-	};
-	for (int pass=0; pass<2; ++pass) {
-		string tgt;
-		string::const_iterator prev=src.begin(), end=src.end();
-		while (1) {
-			boost::smatch m;
-			if (boost::regex_search(prev, end, m, cCodeSpan[pass])) {
-				tgt+=string(prev, m[0].first);
-				tgt+="\x01@"+boost::lexical_cast<string>(replacements.size())+"@codeSpan\x01";
-				prev=m[0].second;
-				replacements.push_back(TokenPtr(new CodeSpan(_restoreProcessedItems(m[1], replacements))));
-			} else {
-				tgt+=string(prev, end);
-				break;
-			}
-		}
-		src.swap(tgt);
-		tgt.clear();
-	}
-	return src;
+    static const regex cCodeSpan[2]= {
+        regex("(?:^|(?<=[^\\\\]))`` (.+?) ``"),
+        regex("(?:^|(?<=[^\\\\]))`(.+?)`")
+    };
+    for (int pass=0; pass<2; ++pass) {
+        string tgt;
+        string::const_iterator prev=src.begin(), end=src.end();
+        while (1) {
+            smatch m;
+            if (regex_search(prev, end, m, cCodeSpan[pass])) {
+                tgt+=string(prev, m[0].first);
+                tgt+="\x01@"+boost::lexical_cast<string>(replacements.size())+"@codeSpan\x01";
+                prev=m[0].second;
+                replacements.push_back(TokenPtr(new CodeSpan(_restoreProcessedItems(m[1], replacements))));
+            } else {
+                tgt+=string(prev, end);
+                break;
+            }
+        }
+        src.swap(tgt);
+        tgt.clear();
+    }
+    return src;
 }
 
 string RawText::_processEscapedCharacters(const string& src) {
-	string tgt;
-	string::const_iterator prev=src.begin(), end=src.end();
-	while (1) {
-		string::const_iterator i=std::find(prev, end, '\\');
-		if (i!=end) {
-			tgt+=string(prev, i);
-			++i;
-			if (i!=end) {
-				optional<size_t> e=isEscapedCharacter(*i);
-				if (e) tgt+="\x01@#"+boost::lexical_cast<string>(*e)+"@escaped\x01";
-				else tgt=tgt+'\\'+*i;
-				prev=i+1;
-			} else {
-				tgt+='\\';
-				break;
-			}
-		} else {
-			tgt+=string(prev, end);
-			break;
-		}
-	}
-	return tgt;
+    string tgt;
+    string::const_iterator prev=src.begin(), end=src.end();
+    while (1) {
+        string::const_iterator i=std::find(prev, end, '\\');
+        if (i!=end) {
+            tgt+=string(prev, i);
+            ++i;
+            if (i!=end) {
+                optional<size_t> e=isEscapedCharacter(*i);
+                if (e) tgt+="\x01@#"+boost::lexical_cast<string>(*e)+"@escaped\x01";
+                else tgt=tgt+'\\'+*i;
+                prev=i+1;
+            } else {
+                tgt+='\\';
+                break;
+            }
+        } else {
+            tgt+=string(prev, end);
+            break;
+        }
+    }
+    return tgt;
 }
 
 string RawText::_processSpaceBracketedGroupings(const string &src,
-	ReplacementTable& replacements)
+        ReplacementTable& replacements)
 {
-	static const boost::regex cRemove("(?:(?: \\*+ )|(?: _+ ))");
+    static const regex cRemove("(?:(?: \\*+ )|(?: _+ ))");
 
-	string tgt;
-	string::const_iterator prev=src.begin(), end=src.end();
-	while (1) {
-		boost::smatch m;
-		if (boost::regex_search(prev, end, m, cRemove)) {
-			tgt+=string(prev, m[0].first);
-			tgt+="\x01@"+boost::lexical_cast<string>(replacements.size())+"@spaceBracketed\x01";
-			replacements.push_back(TokenPtr(new RawText(m[0])));
-			prev=m[0].second;
-		} else {
-			tgt+=string(prev, end);
-			break;
-		}
-	}
-	return tgt;
+    string tgt;
+    string::const_iterator prev=src.begin(), end=src.end();
+    while (1) {
+        smatch m;
+        if (regex_search(prev, end, m, cRemove)) {
+            tgt+=string(prev, m[0].first);
+            tgt+="\x01@"+boost::lexical_cast<string>(replacements.size())+"@spaceBracketed\x01";
+            replacements.push_back(TokenPtr(new RawText(m[0])));
+            prev=m[0].second;
+        } else {
+            tgt+=string(prev, end);
+            break;
+        }
+    }
+    return tgt;
 }
 
 string RawText::_processLinksImagesAndTags(const string &src,
-	ReplacementTable& replacements, const LinkIds& idTable)
+        ReplacementTable& replacements, const LinkIds& idTable)
 {
-	// NOTE: Kludge alert! The "inline link or image" regex should be...
-	//
-	//   "(?:(!?)\\[(.+?)\\] *\\((.*?)\\))"
-	//
-	// ...but that fails on the 'Images' test because it includes a "stupid URL"
-	// that has parentheses within it. The proper way to deal with this would be
-	// to match any nested parentheses, but regular expressions can't handle an
-	// unknown number of nested items, so I'm cheating -- the regex for it
-	// allows for one (and *only* one) pair of matched parentheses within the
-	// URL. It makes the regex hard to follow (it was even harder to get right),
-	// but it allows it to pass the test.
-	//
-	// The "reference link or image" one has a similar problem; it should be...
-	//
-	//   "|(?:(!?)\\[(.+?)\\](?: *\\[(.*?)\\])?)"
-	//
-	static const boost::regex cExpression(
-		"(?:(!?)\\[([^\\]]+?)\\] *\\(([^\\(]*(?:\\(.*?\\).*?)*?)\\))" // Inline link or image
-		"|(?:(!?)\\[((?:[^]]*?\\[.*?\\].*?)|(?:.+?))\\](?: *\\[(.*?)\\])?)" // Reference link or image
-		"|(?:<(/?([a-zA-Z0-9]+).*?)>)" // potential HTML tag or auto-link
-	);
-	// Important captures: 1/4=image indicator, 2/5=contents/alttext,
-	// 3=URL/title, 6=optional link ID, 7=potential HTML tag or auto-link
-	// contents, 8=actual tag from 7.
+    // NOTE: Kludge alert! The "inline link or image" regex should be...
+    //
+    //   "(?:(!?)\\[(.+?)\\] *\\((.*?)\\))"
+    //
+    // ...but that fails on the 'Images' test because it includes a "stupid URL"
+    // that has parentheses within it. The proper way to deal with this would be
+    // to match any nested parentheses, but regular expressions can't handle an
+    // unknown number of nested items, so I'm cheating -- the regex for it
+    // allows for one (and *only* one) pair of matched parentheses within the
+    // URL. It makes the regex hard to follow (it was even harder to get right),
+    // but it allows it to pass the test.
+    //
+    // The "reference link or image" one has a similar problem; it should be...
+    //
+    //   "|(?:(!?)\\[(.+?)\\](?: *\\[(.*?)\\])?)"
+    //
+    static const regex cExpression(
+        "(?:(!?)\\[([^\\]]+?)\\] *\\(([^\\(]*(?:\\(.*?\\).*?)*?)\\))" // Inline link or image
+        "|(?:(!?)\\[((?:[^]]*?\\[.*?\\].*?)|(?:.+?))\\](?: *\\[(.*?)\\])?)" // Reference link or image
+        "|(?:<(/?([a-zA-Z0-9]+).*?)>)" // potential HTML tag or auto-link
+    );
+    // Important captures: 1/4=image indicator, 2/5=contents/alttext,
+    // 3=URL/title, 6=optional link ID, 7=potential HTML tag or auto-link
+    // contents, 8=actual tag from 7.
 
-	string tgt;
-	string::const_iterator prev=src.begin(), end=src.end();
-	while (1) {
-		boost::smatch m;
-		if (boost::regex_search(prev, end, m, cExpression)) {
-			assert(m[0].matched);
-			assert(m[0].length()!=0);
+    string tgt;
+    string::const_iterator prev=src.begin(), end=src.end();
+    while (1) {
+        smatch m;
+        if (regex_search(prev, end, m, cExpression)) {
+            assert(m[0].matched);
+            assert(m[0].length()!=0);
 
-			tgt+=string(prev, m[0].first);
-			tgt+="\x01@"+boost::lexical_cast<string>(replacements.size())+"@links&Images1\x01";
-			prev=m[0].second;
+            tgt+=string(prev, m[0].first);
+            tgt+="\x01@"+boost::lexical_cast<string>(replacements.size())+"@links&Images1\x01";
+            prev=m[0].second;
 
-			bool isImage=false, isLink=false, isReference=false;
-			if (m[4].matched && m[4].length()) isImage=isReference=true;
-			else if (m[1].matched && m[1].length()) isImage=true;
-			else if (m[5].matched) isLink=isReference=true;
-			else if (m[2].matched) isLink=true;
+            bool isImage=false, isLink=false, isReference=false;
+            if (m[4].matched && m[4].length()) isImage=isReference=true;
+            else if (m[1].matched && m[1].length()) isImage=true;
+            else if (m[5].matched) isLink=isReference=true;
+            else if (m[2].matched) isLink=true;
 
-			if (isImage || isLink) {
-				string contentsOrAlttext, url, title;
-				bool resolved=false;
-				if (isReference) {
-					contentsOrAlttext=m[5];
-					string linkId=(m[6].matched ? string(m[6]) : string());
-					if (linkId.empty()) linkId=cleanTextLinkRef(contentsOrAlttext);
+            if (isImage || isLink) {
+                string contentsOrAlttext, url, title;
+                bool resolved=false;
+                if (isReference) {
+                    contentsOrAlttext=m[5];
+                    string linkId=(m[6].matched ? string(m[6]) : string());
+                    if (linkId.empty()) linkId=cleanTextLinkRef(contentsOrAlttext);
 
-					optional<markdown::LinkIds::Target> target=idTable.find(linkId);
-					if (target) { url=target->url; title=target->title; resolved=true; };
-				} else {
-					static const boost::regex cReference("^<?([^ >]*)>?(?: *(?:('|\")(.*)\\2)|(?:\\((.*)\\)))? *$");
-					// Useful captures: 1=url, 3/4=title
-					contentsOrAlttext=m[2];
-					string urlAndTitle=m[3];
-					boost::smatch mm;
-					if (boost::regex_match(urlAndTitle, mm, cReference)) {
-						url=mm[1];
-						if (mm[3].matched) title=mm[3];
-						else if (mm[4].matched) title=mm[4];
-						resolved=true;
-					}
-				}
+                    optional<markdown::LinkIds::Target> target=idTable.find(linkId);
+                    if (target) {
+                        url=target->url;
+                        title=target->title;
+                        resolved=true;
+                    };
+                } else {
+                    static const regex cReference("^<?([^ >]*)>?(?: *(?:('|\")(.*)\\2)|(?:\\((.*)\\)))? *$");
+                    // Useful captures: 1=url, 3/4=title
+                    contentsOrAlttext=m[2];
+                    string urlAndTitle=m[3];
+                    smatch mm;
+                    if (regex_match(urlAndTitle, mm, cReference)) {
+                        url=mm[1];
+                        if (mm[3].matched) title=mm[3];
+                        else if (mm[4].matched) title=mm[4];
+                        resolved=true;
+                    }
+                }
 
-				if (!resolved) {
-					// Just encode the first character as-is, and continue
-					// searching after it.
-					prev=m[0].first+1;
-					replacements.push_back(TokenPtr(new RawText(string(m[0].first, prev))));
-				} else if (isImage) {
-					replacements.push_back(TokenPtr(new Image(contentsOrAlttext,
-						url, title)));
-				} else {
-					replacements.push_back(TokenPtr(new HtmlAnchorTag(url, title)));
-					tgt+=contentsOrAlttext;
-					tgt+="\x01@"+boost::lexical_cast<string>(replacements.size())+"@links&Images2\x01";
-					replacements.push_back(TokenPtr(new HtmlTag("/a")));
-				}
-			} else {
-				// Otherwise it's an HTML tag or auto-link.
-				string contents=m[7];
+                if (!resolved) {
+                    // Just encode the first character as-is, and continue
+                    // searching after it.
+                    prev=m[0].first+1;
+                    replacements.push_back(TokenPtr(new RawText(string(m[0].first, prev))));
+                } else if (isImage) {
+                    replacements.push_back(TokenPtr(new Image(contentsOrAlttext,
+                                                    url, title)));
+                } else {
+                    replacements.push_back(TokenPtr(new HtmlAnchorTag(url, title)));
+                    tgt+=contentsOrAlttext;
+                    tgt+="\x01@"+boost::lexical_cast<string>(replacements.size())+"@links&Images2\x01";
+                    replacements.push_back(TokenPtr(new HtmlTag("/a")));
+                }
+            } else {
+                // Otherwise it's an HTML tag or auto-link.
+                string contents=m[7];
 
 //				cerr << "Evaluating potential HTML or auto-link: " << contents << endl;
 //				cerr << "m[8]=" << m[8] << endl;
 
-				if (looksLikeUrl(contents)) {
-					TokenGroup subgroup;
-					subgroup.push_back(TokenPtr(new HtmlAnchorTag(contents)));
-					subgroup.push_back(TokenPtr(new RawText(contents, false)));
-					subgroup.push_back(TokenPtr(new HtmlTag("/a")));
-					replacements.push_back(TokenPtr(new Container(subgroup)));
-				} else if (looksLikeEmailAddress(contents)) {
-					TokenGroup subgroup;
-					subgroup.push_back(TokenPtr(new HtmlAnchorTag(emailEncode("mailto:"+contents))));
-					subgroup.push_back(TokenPtr(new RawText(emailEncode(contents), false)));
-					subgroup.push_back(TokenPtr(new HtmlTag("/a")));
-					replacements.push_back(TokenPtr(new Container(subgroup)));
-				} else if (isValidTag(m[8])) {
-					replacements.push_back(TokenPtr(new HtmlTag(_restoreProcessedItems(contents, replacements))));
-				} else {
-					// Just encode it as-is
-					replacements.push_back(TokenPtr(new RawText(m[0])));
-				}
-			}
-		} else {
-			tgt+=string(prev, end);
-			break;
-		}
-	}
-	return tgt;
+                if (looksLikeUrl(contents)) {
+                    TokenGroup subgroup;
+                    subgroup.push_back(TokenPtr(new HtmlAnchorTag(contents)));
+                    subgroup.push_back(TokenPtr(new RawText(contents, false)));
+                    subgroup.push_back(TokenPtr(new HtmlTag("/a")));
+                    replacements.push_back(TokenPtr(new Container(subgroup)));
+                } else if (looksLikeEmailAddress(contents)) {
+                    TokenGroup subgroup;
+                    subgroup.push_back(TokenPtr(new HtmlAnchorTag(emailEncode("mailto:"+contents))));
+                    subgroup.push_back(TokenPtr(new RawText(emailEncode(contents), false)));
+                    subgroup.push_back(TokenPtr(new HtmlTag("/a")));
+                    replacements.push_back(TokenPtr(new Container(subgroup)));
+                } else if (isValidTag(m[8])) {
+                    replacements.push_back(TokenPtr(new HtmlTag(_restoreProcessedItems(contents, replacements))));
+                } else {
+                    // Just encode it as-is
+                    replacements.push_back(TokenPtr(new RawText(m[0])));
+                }
+            }
+        } else {
+            tgt+=string(prev, end);
+            break;
+        }
+    }
+    return tgt;
 }
 
 TokenGroup RawText::_processBoldAndItalicSpans(const string& src,
-	ReplacementTable& replacements)
+        ReplacementTable& replacements)
 {
-	static const boost::regex cEmphasisExpression(
-		"(?:(?<![*_])([*_]{1,3})([^*_ ]+?)\\1(?![*_]))"                                    // Mid-word emphasis
-		"|((?:(?<!\\*)\\*{1,3}(?!\\*)|(?<!_)_{1,3}(?!_))(?=.)(?! )(?![.,:;] )(?![.,:;]$))" // Open
-		"|((?<![* ])\\*{1,3}(?!\\*)|(?<![ _])_{1,3}(?!_))"                                 // Close
-	);
+    static const regex cEmphasisExpression(
+        "(?:(?<![*_])([*_]{1,3})([^*_ ]+?)\\1(?![*_]))"                                    // Mid-word emphasis
+        "|((?:(?<!\\*)\\*{1,3}(?!\\*)|(?<!_)_{1,3}(?!_))(?=.)(?! )(?![.,:;] )(?![.,:;]$))" // Open
+        "|((?<![* ])\\*{1,3}(?!\\*)|(?<![ _])_{1,3}(?!_))"                                 // Close
+    );
 
-	TokenGroup tgt;
-	string::const_iterator i=src.begin(), end=src.end(), prev=i;
+    TokenGroup tgt;
+    string::const_iterator i=src.begin(), end=src.end(), prev=i;
 
-	while (1) {
-		boost::smatch m;
-		if (boost::regex_search(prev, end, m, cEmphasisExpression)) {
-			if (prev!=m[0].first) tgt.push_back(TokenPtr(new
-				RawText(string(prev, m[0].first))));
-			if (m[3].matched) {
-				string token=m[3];
-				tgt.push_back(TokenPtr(new BoldOrItalicMarker(true, token[0],
-					token.length())));
-				prev=m[0].second;
-			} else if (m[4].matched) {
-				string token=m[4];
-				tgt.push_back(TokenPtr(new BoldOrItalicMarker(false, token[0],
-					token.length())));
-				prev=m[0].second;
-			} else {
-				string token=m[1], contents=m[2];
-				tgt.push_back(TokenPtr(new BoldOrItalicMarker(true, token[0],
-					token.length())));
-				tgt.push_back(TokenPtr(new RawText(string(contents))));
-				tgt.push_back(TokenPtr(new BoldOrItalicMarker(false, token[0],
-					token.length())));
-				prev=m[0].second;
-			}
-		} else {
-			if (prev!=end) tgt.push_back(TokenPtr(new RawText(string(prev,
-				end))));
-			break;
-		}
-	}
+    while (1) {
+        smatch m;
+        if (regex_search(prev, end, m, cEmphasisExpression)) {
+            if (prev!=m[0].first) tgt.push_back(TokenPtr(new
+                                                    RawText(string(prev, m[0].first))));
+            if (m[3].matched) {
+                string token=m[3];
+                tgt.push_back(TokenPtr(new BoldOrItalicMarker(true, token[0],
+                                       token.length())));
+                prev=m[0].second;
+            } else if (m[4].matched) {
+                string token=m[4];
+                tgt.push_back(TokenPtr(new BoldOrItalicMarker(false, token[0],
+                                       token.length())));
+                prev=m[0].second;
+            } else {
+                string token=m[1], contents=m[2];
+                tgt.push_back(TokenPtr(new BoldOrItalicMarker(true, token[0],
+                                       token.length())));
+                tgt.push_back(TokenPtr(new RawText(string(contents))));
+                tgt.push_back(TokenPtr(new BoldOrItalicMarker(false, token[0],
+                                       token.length())));
+                prev=m[0].second;
+            }
+        } else {
+            if (prev!=end) tgt.push_back(TokenPtr(new RawText(string(prev,
+                                                      end))));
+            break;
+        }
+    }
 
-	int id=0;
-	for (TokenGroup::iterator ii=tgt.begin(), iie=tgt.end(); ii!=iie; ++ii) {
-		if ((*ii)->isUnmatchedOpenMarker()) {
-			BoldOrItalicMarker *openToken=dynamic_cast<BoldOrItalicMarker*>(ii->get());
+    int id=0;
+    for (TokenGroup::iterator ii=tgt.begin(), iie=tgt.end(); ii!=iie; ++ii) {
+        if ((*ii)->isUnmatchedOpenMarker()) {
+            BoldOrItalicMarker *openToken=dynamic_cast<BoldOrItalicMarker*>(ii->get());
 
-			// Find a matching close-marker, if it's there
-			TokenGroup::iterator iii=ii;
-			for (++iii; iii!=iie; ++iii) {
-				if ((*iii)->isUnmatchedCloseMarker()) {
-					BoldOrItalicMarker *closeToken=dynamic_cast<BoldOrItalicMarker*>(iii->get());
-					if (closeToken->size()==3 && openToken->size()!=3) {
-						// Split the close-token into a match for the open-token
-						// and a second for the leftovers.
-						closeToken->disable();
-						TokenGroup g;
-						g.push_back(TokenPtr(new BoldOrItalicMarker(false,
-							closeToken->tokenCharacter(), closeToken->size()-
-							openToken->size())));
-						g.push_back(TokenPtr(new BoldOrItalicMarker(false,
-							closeToken->tokenCharacter(), openToken->size())));
-						TokenGroup::iterator after=iii;
-						++after;
-						tgt.splice(after, g);
-						continue;
-					}
+            // Find a matching close-marker, if it's there
+            TokenGroup::iterator iii=ii;
+            for (++iii; iii!=iie; ++iii) {
+                if ((*iii)->isUnmatchedCloseMarker()) {
+                    BoldOrItalicMarker *closeToken=dynamic_cast<BoldOrItalicMarker*>(iii->get());
+                    if (closeToken->size()==3 && openToken->size()!=3) {
+                        // Split the close-token into a match for the open-token
+                        // and a second for the leftovers.
+                        closeToken->disable();
+                        TokenGroup g;
+                        g.push_back(TokenPtr(new BoldOrItalicMarker(false,
+                                             closeToken->tokenCharacter(), closeToken->size()-
+                                             openToken->size())));
+                        g.push_back(TokenPtr(new BoldOrItalicMarker(false,
+                                             closeToken->tokenCharacter(), openToken->size())));
+                        TokenGroup::iterator after=iii;
+                        ++after;
+                        tgt.splice(after, g);
+                        continue;
+                    }
 
-					if (closeToken->tokenCharacter()==openToken->tokenCharacter()
-						&& closeToken->size()==openToken->size())
-					{
-						openToken->matched(closeToken, id);
-						closeToken->matched(openToken, id);
-						++id;
-						break;
-					} else if (openToken->size()==3) {
-						// Split the open-token into a match for the close-token
-						// and a second for the leftovers.
-						openToken->disable();
-						TokenGroup g;
-						g.push_back(TokenPtr(new BoldOrItalicMarker(true,
-							openToken->tokenCharacter(), openToken->size()-
-							closeToken->size())));
-						g.push_back(TokenPtr(new BoldOrItalicMarker(true,
-							openToken->tokenCharacter(), closeToken->size())));
-						TokenGroup::iterator after=ii;
-						++after;
-						tgt.splice(after, g);
-						break;
-					}
-				}
-			}
-		}
-	}
+                    if (closeToken->tokenCharacter()==openToken->tokenCharacter()
+                            && closeToken->size()==openToken->size())
+                    {
+                        openToken->matched(closeToken, id);
+                        closeToken->matched(openToken, id);
+                        ++id;
+                        break;
+                    } else if (openToken->size()==3) {
+                        // Split the open-token into a match for the close-token
+                        // and a second for the leftovers.
+                        openToken->disable();
+                        TokenGroup g;
+                        g.push_back(TokenPtr(new BoldOrItalicMarker(true,
+                                             openToken->tokenCharacter(), openToken->size()-
+                                             closeToken->size())));
+                        g.push_back(TokenPtr(new BoldOrItalicMarker(true,
+                                             openToken->tokenCharacter(), closeToken->size())));
+                        TokenGroup::iterator after=ii;
+                        ++after;
+                        tgt.splice(after, g);
+                        break;
+                    }
+                }
+            }
+        }
+    }
 
-	// "Unmatch" invalidly-nested matches.
-	std::stack<BoldOrItalicMarker*> openMatches;
-	for (TokenGroup::iterator ii=tgt.begin(), iie=tgt.end(); ii!=iie; ++ii) {
-		if ((*ii)->isMatchedOpenMarker()) {
-			BoldOrItalicMarker *open=dynamic_cast<BoldOrItalicMarker*>(ii->get());
-			openMatches.push(open);
-		} else if ((*ii)->isMatchedCloseMarker()) {
-			BoldOrItalicMarker *close=dynamic_cast<BoldOrItalicMarker*>(ii->get());
+    // "Unmatch" invalidly-nested matches.
+    std::stack<BoldOrItalicMarker*> openMatches;
+    for (TokenGroup::iterator ii=tgt.begin(), iie=tgt.end(); ii!=iie; ++ii) {
+        if ((*ii)->isMatchedOpenMarker()) {
+            BoldOrItalicMarker *open=dynamic_cast<BoldOrItalicMarker*>(ii->get());
+            openMatches.push(open);
+        } else if ((*ii)->isMatchedCloseMarker()) {
+            BoldOrItalicMarker *close=dynamic_cast<BoldOrItalicMarker*>(ii->get());
 
-			if (close->id() != openMatches.top()->id()) {
-				close->matchedTo()->matched(0);
-				close->matched(0);
-			} else {
-				openMatches.pop();
-				while (!openMatches.empty() && openMatches.top()->matchedTo()==0)
-					openMatches.pop();
-			}
-		}
-	}
+            if (close->id() != openMatches.top()->id()) {
+                close->matchedTo()->matched(0);
+                close->matched(0);
+            } else {
+                openMatches.pop();
+                while (!openMatches.empty() && openMatches.top()->matchedTo()==0)
+                    openMatches.pop();
+            }
+        }
+    }
 
-	TokenGroup r;
-	for (TokenGroup::iterator ii=tgt.begin(), iie=tgt.end(); ii!=iie; ++ii) {
-		if ((*ii)->text() && (*ii)->canContainMarkup()) {
-			TokenGroup t=_encodeProcessedItems(*(*ii)->text(), replacements);
-			r.splice(r.end(), t);
-		} else r.push_back(*ii);
-	}
+    TokenGroup r;
+    for (TokenGroup::iterator ii=tgt.begin(), iie=tgt.end(); ii!=iie; ++ii) {
+        if ((*ii)->text() && (*ii)->canContainMarkup()) {
+            TokenGroup t=_encodeProcessedItems(*(*ii)->text(), replacements);
+            r.splice(r.end(), t);
+        } else r.push_back(*ii);
+    }
 
-	return r;
+    return r;
 }
 
 TokenGroup RawText::_encodeProcessedItems(const string &src,
-	ReplacementTable& replacements)
+        ReplacementTable& replacements)
 {
-	static const boost::regex cReplaced("\x01@(#?[0-9]*)@.+?\x01");
+    static const regex cReplaced("\x01@(#?[0-9]*)@.+?\x01");
 
-	TokenGroup r;
-	string::const_iterator prev=src.begin();
-	while (1) {
-		boost::smatch m;
-		if (boost::regex_search(prev, src.end(), m, cReplaced)) {
-			string pre=string(prev, m[0].first);
-			if (!pre.empty()) r.push_back(TokenPtr(new RawText(pre)));
-			prev=m[0].second;
+    TokenGroup r;
+    string::const_iterator prev=src.begin();
+    while (1) {
+        smatch m;
+        if (regex_search(prev, src.end(), m, cReplaced)) {
+            string pre=string(prev, m[0].first);
+            if (!pre.empty()) r.push_back(TokenPtr(new RawText(pre)));
+            prev=m[0].second;
 
-			string ref=m[1];
-			if (ref[0]=='#') {
-				size_t n=boost::lexical_cast<size_t>(ref.substr(1));
-				r.push_back(TokenPtr(new EscapedCharacter(escapedCharacter(n))));
-			} else if (!ref.empty()) {
-				size_t n=boost::lexical_cast<size_t>(ref);
+            string ref=m[1];
+            if (ref[0]=='#') {
+                size_t n=boost::lexical_cast<size_t>(ref.substr(1));
+                r.push_back(TokenPtr(new EscapedCharacter(escapedCharacter(n))));
+            } else if (!ref.empty()) {
+                size_t n=boost::lexical_cast<size_t>(ref);
 
-				assert(n<replacements.size());
-				r.push_back(replacements[n]);
-			} // Otherwise just eat it
-		} else {
-			string pre=string(prev, src.end());
-			if (!pre.empty()) r.push_back(TokenPtr(new RawText(pre)));
-			break;
-		}
-	}
-	return r;
+                assert(n<replacements.size());
+                r.push_back(replacements[n]);
+            } // Otherwise just eat it
+        } else {
+            string pre=string(prev, src.end());
+            if (!pre.empty()) r.push_back(TokenPtr(new RawText(pre)));
+            break;
+        }
+    }
+    return r;
 }
 
 string RawText::_restoreProcessedItems(const string &src,
-	ReplacementTable& replacements)
+                                       ReplacementTable& replacements)
 {
-	static const boost::regex cReplaced("\x01@(#?[0-9]*)@.+?\x01");
+    static const regex cReplaced("\x01@(#?[0-9]*)@.+?\x01");
 
-	std::ostringstream r;
-	string::const_iterator prev=src.begin();
-	while (1) {
-		boost::smatch m;
-		if (boost::regex_search(prev, src.end(), m, cReplaced)) {
-			string pre=string(prev, m[0].first);
-			if (!pre.empty()) r << pre;
-			prev=m[0].second;
+    std::ostringstream r;
+    string::const_iterator prev=src.begin();
+    while (1) {
+        smatch m;
+        if (regex_search(prev, src.end(), m, cReplaced)) {
+            string pre=string(prev, m[0].first);
+            if (!pre.empty()) r << pre;
+            prev=m[0].second;
 
-			string ref=m[1];
-			if (ref[0]=='#') {
-				size_t n=boost::lexical_cast<size_t>(ref.substr(1));
-				r << '\\' << escapedCharacter(n);
-			} else if (!ref.empty()) {
-				size_t n=boost::lexical_cast<size_t>(ref);
+            string ref=m[1];
+            if (ref[0]=='#') {
+                size_t n=boost::lexical_cast<size_t>(ref.substr(1));
+                r << '\\' << escapedCharacter(n);
+            } else if (!ref.empty()) {
+                size_t n=boost::lexical_cast<size_t>(ref);
 
-				assert(n<replacements.size());
-				replacements[n]->writeAsOriginal(r);
-			} // Otherwise just eat it
-		} else {
-			string pre=string(prev, src.end());
-			if (!pre.empty()) r << pre;
-			break;
-		}
-	}
-	return r.str();
+                assert(n<replacements.size());
+                replacements[n]->writeAsOriginal(r);
+            } // Otherwise just eat it
+        } else {
+            string pre=string(prev, src.end());
+            if (!pre.empty()) r << pre;
+            break;
+        }
+    }
+    return r.str();
 }
 
 HtmlAnchorTag::HtmlAnchorTag(const string& url, const string& title):
-	TextHolder("<a href=\""+encodeString(url, cQuotes|cAmps)+"\""
-		+(title.empty() ? string() : " title=\""+encodeString(title, cQuotes|cAmps)+"\"")
-		+">", false, 0)
+    TextHolder("<a href=\""+encodeString(url, cQuotes|cAmps)+"\""
+               +(title.empty() ? string() : " title=\""+encodeString(title, cQuotes|cAmps)+"\"")
+               +">", false, 0)
 {
-	// This space deliberately blank. ;-)
+    // This space deliberately blank. ;-)
 }
 
 void CodeBlock::writeAsHtml(std::ostream& out) const {
-	out << "<pre><code>";
-	TextHolder::writeAsHtml(out);
-	out << "</code></pre>\n\n";
+    out << "<pre><code>";
+    TextHolder::writeAsHtml(out);
+    out << "</code></pre>\n\n";
 }
 
 void FencedCodeBlock::writeAsHtml(std::ostream& out) const
@@ -683,110 +697,110 @@ void FencedCodeBlock::writeAsHtml(std::ostream& out) const
         out << "<pre><code class=\"language-"+ string(si, sii) + "\">";
         mHighlighter->highlight(*text(), string(si, sii), out);
     }
-    
+
     out << "</code></pre>\n\n";
 }
 
 
 void CodeSpan::writeAsHtml(std::ostream& out) const {
-	out << "<code>";
-	TextHolder::writeAsHtml(out);
-	out << "</code>";
+    out << "<code>";
+    TextHolder::writeAsHtml(out);
+    out << "</code>";
 }
 
 void CodeSpan::writeAsOriginal(std::ostream& out) const {
-	out << '`' << *text() << '`';
+    out << '`' << *text() << '`';
 }
 
 
 
 void Container::writeAsHtml(std::ostream& out) const {
-	preWrite(out);
-	for (CTokenGroupIter i=mSubTokens.begin(), ie=mSubTokens.end(); i!=ie; ++i)
-		(*i)->writeAsHtml(out);
-	postWrite(out);
+    preWrite(out);
+    for (CTokenGroupIter i=mSubTokens.begin(), ie=mSubTokens.end(); i!=ie; ++i)
+        (*i)->writeAsHtml(out);
+    postWrite(out);
 }
 
 void Container::writeToken(size_t indent, std::ostream& out) const {
-	out << string(indent*2, ' ') << containerName() << endl;
-	for (CTokenGroupIter ii=mSubTokens.begin(), iie=mSubTokens.end(); ii!=iie;
-		++ii)
-			(*ii)->writeToken(indent+1, out);
+    out << string(indent*2, ' ') << containerName() << endl;
+    for (CTokenGroupIter ii=mSubTokens.begin(), iie=mSubTokens.end(); ii!=iie;
+            ++ii)
+        (*ii)->writeToken(indent+1, out);
 }
 
 optional<TokenGroup> Container::processSpanElements(const LinkIds& idTable) {
-	TokenGroup t;
-	for (CTokenGroupIter ii=mSubTokens.begin(), iie=mSubTokens.end(); ii!=iie;
-		++ii)
-	{
-		if ((*ii)->text()) {
-			optional<TokenGroup> subt=(*ii)->processSpanElements(idTable);
-			if (subt) {
-				if (subt->size()>1) t.push_back(TokenPtr(new Container(*subt)));
-				else if (!subt->empty()) t.push_back(*subt->begin());
-			} else t.push_back(*ii);
-		} else {
-			optional<TokenGroup> subt=(*ii)->processSpanElements(idTable);
-			if (subt) {
-				const Container *c=dynamic_cast<const Container*>((*ii).get());
-				assert(c!=0);
-				t.push_back(c->clone(*subt));
-			} else t.push_back(*ii);
-		}
-	}
-	swapSubtokens(t);
-	return none;
+    TokenGroup t;
+    for (CTokenGroupIter ii=mSubTokens.begin(), iie=mSubTokens.end(); ii!=iie;
+            ++ii)
+    {
+        if ((*ii)->text()) {
+            optional<TokenGroup> subt=(*ii)->processSpanElements(idTable);
+            if (subt) {
+                if (subt->size()>1) t.push_back(TokenPtr(new Container(*subt)));
+                else if (!subt->empty()) t.push_back(*subt->begin());
+            } else t.push_back(*ii);
+        } else {
+            optional<TokenGroup> subt=(*ii)->processSpanElements(idTable);
+            if (subt) {
+                const Container *c=dynamic_cast<const Container*>((*ii).get());
+                assert(c!=0);
+                t.push_back(c->clone(*subt));
+            } else t.push_back(*ii);
+        }
+    }
+    swapSubtokens(t);
+    return none;
 }
 
 UnorderedList::UnorderedList(const TokenGroup& contents, bool paragraphMode) {
-	if (paragraphMode) {
-		// Change each of the text items into paragraphs
-		for (CTokenGroupIter i=contents.begin(), ie=contents.end(); i!=ie; ++i) {
-			token::ListItem *item=dynamic_cast<token::ListItem*>((*i).get());
-			assert(item!=0);
-			item->inhibitParagraphs(false);
-			mSubTokens.push_back(*i);
-		}
-	} else mSubTokens=contents;
+    if (paragraphMode) {
+        // Change each of the text items into paragraphs
+        for (CTokenGroupIter i=contents.begin(), ie=contents.end(); i!=ie; ++i) {
+            token::ListItem *item=dynamic_cast<token::ListItem*>((*i).get());
+            assert(item!=0);
+            item->inhibitParagraphs(false);
+            mSubTokens.push_back(*i);
+        }
+    } else mSubTokens=contents;
 }
 
 
 
 void BoldOrItalicMarker::writeAsHtml(std::ostream& out) const {
-	if (!mDisabled) {
-		if (mMatch!=0) {
-			assert(mSize>=1 && mSize<=3);
-			if (mOpenMarker) {
-				out << (mSize==1 ? "<em>" : mSize==2 ? "<strong>" : "<strong><em>");
-			} else {
-				out << (mSize==1 ? "</em>" : mSize==2 ? "</strong>" : "</em></strong>");
-			}
-		} else out << string(mSize, mTokenCharacter);
-	}
+    if (!mDisabled) {
+        if (mMatch!=0) {
+            assert(mSize>=1 && mSize<=3);
+            if (mOpenMarker) {
+                out << (mSize==1 ? "<em>" : mSize==2 ? "<strong>" : "<strong><em>");
+            } else {
+                out << (mSize==1 ? "</em>" : mSize==2 ? "</strong>" : "</em></strong>");
+            }
+        } else out << string(mSize, mTokenCharacter);
+    }
 }
 
 void BoldOrItalicMarker::writeToken(std::ostream& out) const {
-	if (!mDisabled) {
-		if (mMatch!=0) {
-			string type=(mSize==1 ? "italic" : mSize==2 ? "bold" : "italic&bold");
-			if (mOpenMarker) {
-				out << "Matched open-" << type << " marker" << endl;
-			} else {
-				out << "Matched close-" << type << " marker" << endl;
-			}
-		} else {
-			if (mOpenMarker) out << "Unmatched bold/italic open marker: " <<
-				string(mSize, mTokenCharacter) << endl;
-			else out << "Unmatched bold/italic close marker: " <<
-				string(mSize, mTokenCharacter) << endl;
-		}
-	}
+    if (!mDisabled) {
+        if (mMatch!=0) {
+            string type=(mSize==1 ? "italic" : mSize==2 ? "bold" : "italic&bold");
+            if (mOpenMarker) {
+                out << "Matched open-" << type << " marker" << endl;
+            } else {
+                out << "Matched close-" << type << " marker" << endl;
+            }
+        } else {
+            if (mOpenMarker) out << "Unmatched bold/italic open marker: " <<
+                                     string(mSize, mTokenCharacter) << endl;
+            else out << "Unmatched bold/italic close marker: " <<
+                         string(mSize, mTokenCharacter) << endl;
+        }
+    }
 }
 
 void Image::writeAsHtml(std::ostream& out) const {
-	out << "<img src=\"" << mUrl << "\" alt=\"" << mAltText << "\"";
-	if (!mTitle.empty()) out << " title=\"" << mTitle << "\"";
-	out << "/>";
+    out << "<img src=\"" << mUrl << "\" alt=\"" << mAltText << "\"";
+    if (!mTitle.empty()) out << " title=\"" << mTitle << "\"";
+    out << "/>";
 }
 
 } // namespace token

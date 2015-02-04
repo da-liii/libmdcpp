@@ -7,8 +7,6 @@ It is intended for [KMarknote](https://github.com/sadhen/KMarknoteo).
 ## Install
 First of all, you need install the dependencies. In debian, just
 ```
-# you may only need regex library of boost, for convenience
-# I recommend you install all the development files of libboost
 sudo apt-get install cmake libboost-all-dev
 ```
 
