@@ -8,16 +8,17 @@
 #include "markdown_tokens.h"
 
 #include <stack>
-#include <regex>
 #include <unordered_set>
 
 #include <boost/lexical_cast.hpp>
+#include <boost/regex.hpp>
 
 using std::cerr;
 using std::endl;
-using std::regex;
-using std::smatch;
-using std::regex_match;
+using boost::regex;
+using boost::smatch;
+using boost::regex_search;
+using boost::regex_match;
 using std::unordered_set;
 
 namespace markdown {
@@ -283,28 +284,25 @@ string RawText::_processHtmlTagAttributes(string src, ReplacementTable&
 string RawText::_processCodeSpans(string src, ReplacementTable&
                                   replacements)
 {
-    static const regex cCodeSpan[2]= {
-        regex("(?:^|(?<=[^\\\\]))`` (.+?) ``"),
-        regex("(?:^|(?<=[^\\\\]))`(.+?)`")
-    };
-    for (int pass=0; pass<2; ++pass) {
-        string tgt;
-        string::const_iterator prev=src.begin(), end=src.end();
-        while (1) {
-            smatch m;
-            if (regex_search(prev, end, m, cCodeSpan[pass])) {
-                tgt+=string(prev, m[0].first);
-                tgt+="\x01@"+boost::lexical_cast<string>(replacements.size())+"@codeSpan\x01";
-                prev=m[0].second;
-                replacements.push_back(TokenPtr(new CodeSpan(_restoreProcessedItems(m[1], replacements))));
-            } else {
-                tgt+=string(prev, end);
-                break;
-            }
+    static const regex cCodeSpan = regex("(?<!`)(`+)(?!`) *(.*?[^ ]) *(?<!`)\\1(?!`)");
+    
+    string tgt;
+    auto prev=src.cbegin(), end=src.cend();
+    while (true) {
+        smatch m;
+        if (regex_search(prev, end, m, cCodeSpan)) {
+            tgt += string(prev, m[0].first);
+            tgt += "\x01@"+boost::lexical_cast<string>(replacements.size())+"@codeSpan\x01";
+            prev = m[0].second;
+            replacements.push_back(TokenPtr(new CodeSpan(_restoreProcessedItems(m.str(2), replacements))));
+        } else {
+            tgt += string(prev, end);
+            break;
         }
-        src.swap(tgt);
-        tgt.clear();
     }
+    src.swap(tgt);
+    tgt.clear();
+        
     return src;
 }
 

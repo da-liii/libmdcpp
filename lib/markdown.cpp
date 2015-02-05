@@ -11,15 +11,15 @@
 #include <sstream>
 #include <cassert>
 
-#include <regex>
+#include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
 
 using std::cerr;
 using std::endl;
-using std::regex;
-using std::smatch;
-using std::regex_match;
+using boost::regex;
+using boost::smatch;
+using boost::regex_match;
 
 using boost::optional;
 using boost::none;
