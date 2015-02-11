@@ -225,6 +225,7 @@ optional<TokenPtr> parseCodeBlock(CTokenGroupIter& i, CTokenGroupIter end) {
                 if (contents) out << *contents << '\n';
                 else break;
             }
+            i--;
             return TokenPtr(new markdown::token::CodeBlock(out.str()));
         }
     }
@@ -884,6 +885,7 @@ void Document::_processBlocksItems(TokenPtr inTokenContainer) {
     assert(tokens!=0);
 
     TokenGroup processed;
+    bool isPrevParagraph = false;
 
     for (auto ii=tokens->subTokens().cbegin(),
             iie=tokens->subTokens().cend(); ii!=iie; ++ii)
@@ -894,17 +896,23 @@ void Document::_processBlocksItems(TokenPtr inTokenContainer) {
             if (!subitem) subitem=parseHorizontalRule(ii, iie);
             if (!subitem) subitem=parseListBlock(ii, iie);
             if (!subitem) subitem=parseBlockQuote(ii, iie);
-            if (!subitem) subitem=parseCodeBlock(ii, iie);
+            if (!subitem && !isPrevParagraph)
+                subitem=parseCodeBlock(ii, iie);
 
             if (subitem) {
                 _processBlocksItems(*subitem);
                 processed.push_back(*subitem);
+                isPrevParagraph = false;
                 if (ii==iie) break;
                 continue;
-            } else processed.push_back(*ii);
+            } else {
+                processed.push_back(*ii);
+                isPrevParagraph = true;
+            }
         } else if ((*ii)->isContainer()) {
             _processBlocksItems(*ii);
             processed.push_back(*ii);
+            isPrevParagraph = false;
         }
     }
     tokens->swapSubtokens(processed);
@@ -926,16 +934,13 @@ void Document::_processParagraphLines(TokenPtr inTokenContainer) {
             iie=tokens->subTokens().cend(); ii!=iie; ++ii)
     {
         if ((*ii)->text() && (*ii)->canContainMarkup() && !(*ii)->inhibitParagraphs()) {
-            static const regex cExpression("^(.*?)  +$");
-
+            static const regex cExpression("^ *(.*?)(  +)?$");
             smatch m;
-            if (regex_match(*(*ii)->text(), m, cExpression)) {
-                paragraphTokens.push_back(TokenPtr(new markdown::token::RawText(m.str(1))));
-                auto after = ii;
-                if (++after != iie)
-                    paragraphTokens.push_back(TokenPtr(new markdown::token::HtmlTag("br /")));
-            } else 
-                paragraphTokens.push_back(TokenPtr(new markdown::token::RawText(*(*ii)->text())));
+            regex_match(*(*ii)->text(), m, cExpression);
+            paragraphTokens.push_back(TokenPtr(new markdown::token::RawText(m.str(1))));
+            auto after = ii;
+            if (m[2].matched && ++after != iie)
+                paragraphTokens.push_back(TokenPtr(new markdown::token::HtmlTag("br /")));
         } else {
             flushParagraph(paragraphTokens, processed, noPara);
             processed.push_back(*ii);
