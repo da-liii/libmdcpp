@@ -47,7 +47,7 @@ string encodeString(const string& src, int encodingFlags) {
          quotes=(encodingFlags & cQuotes)!=0;
 
     string tgt;
-    for (string::const_iterator i=src.begin(), ie=src.end(); i!=ie; ++i) {
+    for (auto i=src.cbegin(), ie=src.cend(); i!=ie; ++i) {
         if (*i=='&' && amps) {
             static const regex cIgnore("^(&amp;)|(&#[0-9]{1,3};)|(&#[xX][0-9a-fA-F]{1,2};)");
             if (regex_search(i, ie, cIgnore)) {
@@ -99,7 +99,7 @@ bool isNotAlpha(char c) {
 string emailEncode(const string& src) {
     std::ostringstream out;
     bool inHex=false;
-    for (string::const_iterator i=src.begin(), ie=src.end(); i!=ie;
+    for (auto i=src.cbegin(), ie=src.cend(); i!=ie;
             ++i)
     {
         if (*i & 0x80) out << *i;
@@ -181,7 +181,7 @@ void initTag(unordered_set<string> &set, const char *init[]) {
 
 string cleanTextLinkRef(const string& ref) {
     string r;
-    for (string::const_iterator i=ref.begin(), ie=ref.end(); i!=ie;
+    for (auto i=ref.cbegin(), ie=ref.cend(); i!=ie;
             ++i)
     {
         if (*i==' ') {
@@ -519,12 +519,12 @@ TokenGroup RawText::_processBoldAndItalicSpans(const string& src,
     }
 
     int id=0;
-    for (TokenGroup::iterator ii=tgt.begin(), iie=tgt.end(); ii!=iie; ++ii) {
+    for (auto ii=tgt.begin(), iie=tgt.end(); ii!=iie; ++ii) {
         if ((*ii)->isUnmatchedOpenMarker()) {
             BoldOrItalicMarker *openToken=dynamic_cast<BoldOrItalicMarker*>(ii->get());
 
             // Find a matching close-marker, if it's there
-            TokenGroup::iterator iii=ii;
+            auto iii=ii;
             for (++iii; iii!=iie; ++iii) {
                 if ((*iii)->isUnmatchedCloseMarker()) {
                     BoldOrItalicMarker *closeToken=dynamic_cast<BoldOrItalicMarker*>(iii->get());
@@ -538,7 +538,7 @@ TokenGroup RawText::_processBoldAndItalicSpans(const string& src,
                                              openToken->size())));
                         g.push_back(TokenPtr(new BoldOrItalicMarker(false,
                                              closeToken->tokenCharacter(), openToken->size())));
-                        TokenGroup::iterator after=iii;
+                        auto after=iii;
                         ++after;
                         tgt.splice(after, g);
                         continue;
@@ -561,7 +561,7 @@ TokenGroup RawText::_processBoldAndItalicSpans(const string& src,
                                              closeToken->size())));
                         g.push_back(TokenPtr(new BoldOrItalicMarker(true,
                                              openToken->tokenCharacter(), closeToken->size())));
-                        TokenGroup::iterator after=ii;
+                        auto after=ii;
                         ++after;
                         tgt.splice(after, g);
                         break;
@@ -573,7 +573,7 @@ TokenGroup RawText::_processBoldAndItalicSpans(const string& src,
 
     // "Unmatch" invalidly-nested matches.
     std::stack<BoldOrItalicMarker*> openMatches;
-    for (TokenGroup::iterator ii=tgt.begin(), iie=tgt.end(); ii!=iie; ++ii) {
+    for (auto ii=tgt.begin(), iie=tgt.end(); ii!=iie; ++ii) {
         if ((*ii)->isMatchedOpenMarker()) {
             BoldOrItalicMarker *open=dynamic_cast<BoldOrItalicMarker*>(ii->get());
             openMatches.push(open);
@@ -592,7 +592,7 @@ TokenGroup RawText::_processBoldAndItalicSpans(const string& src,
     }
 
     TokenGroup r;
-    for (TokenGroup::iterator ii=tgt.begin(), iie=tgt.end(); ii!=iie; ++ii) {
+    for (auto ii=tgt.begin(), iie=tgt.end(); ii!=iie; ++ii) {
         if ((*ii)->text() && (*ii)->canContainMarkup()) {
             TokenGroup t=_encodeProcessedItems(*(*ii)->text(), replacements);
             r.splice(r.end(), t);
@@ -608,10 +608,10 @@ TokenGroup RawText::_encodeProcessedItems(const string &src,
     static const regex cReplaced("\x01@(#?[0-9]*)@.+?\x01");
 
     TokenGroup r;
-    string::const_iterator prev=src.begin();
+    auto prev=src.cbegin();
     while (1) {
         smatch m;
-        if (regex_search(prev, src.end(), m, cReplaced)) {
+        if (regex_search(prev, src.cend(), m, cReplaced)) {
             string pre=string(prev, m[0].first);
             if (!pre.empty()) r.push_back(TokenPtr(new RawText(pre)));
             prev=m[0].second;
@@ -628,7 +628,8 @@ TokenGroup RawText::_encodeProcessedItems(const string &src,
             } // Otherwise just eat it
         } else {
             string pre=string(prev, src.end());
-            if (!pre.empty()) r.push_back(TokenPtr(new RawText(pre)));
+            if (!pre.empty())
+                r.push_back(TokenPtr(new RawText(pre)));
             break;
         }
     }
@@ -641,10 +642,10 @@ string RawText::_restoreProcessedItems(const string &src,
     static const regex cReplaced("\x01@(#?[0-9]*)@.+?\x01");
 
     std::ostringstream r;
-    string::const_iterator prev=src.begin();
+    auto prev=src.cbegin();
     while (1) {
         smatch m;
-        if (regex_search(prev, src.end(), m, cReplaced)) {
+        if (regex_search(prev, src.cend(), m, cReplaced)) {
             string pre=string(prev, m[0].first);
             if (!pre.empty()) r << pre;
             prev=m[0].second;
@@ -714,21 +715,21 @@ void CodeSpan::writeAsOriginal(std::ostream& out) const {
 
 void Container::writeAsHtml(std::ostream& out) const {
     preWrite(out);
-    for (CTokenGroupIter i=mSubTokens.begin(), ie=mSubTokens.end(); i!=ie; ++i)
+    for (auto i=mSubTokens.cbegin(), ie=mSubTokens.cend(); i!=ie; ++i)
         (*i)->writeAsHtml(out);
     postWrite(out);
 }
 
 void Container::writeToken(size_t indent, std::ostream& out) const {
     out << string(indent*2, ' ') << containerName() << endl;
-    for (CTokenGroupIter ii=mSubTokens.begin(), iie=mSubTokens.end(); ii!=iie;
+    for (auto ii=mSubTokens.cbegin(), iie=mSubTokens.cend(); ii!=iie;
             ++ii)
         (*ii)->writeToken(indent+1, out);
 }
 
 optional<TokenGroup> Container::processSpanElements(const LinkIds& idTable) {
     TokenGroup t;
-    for (CTokenGroupIter ii=mSubTokens.begin(), iie=mSubTokens.end(); ii!=iie;
+    for (auto ii=mSubTokens.cbegin(), iie=mSubTokens.cend(); ii!=iie;
             ++ii)
     {
         if ((*ii)->text()) {
@@ -753,7 +754,7 @@ optional<TokenGroup> Container::processSpanElements(const LinkIds& idTable) {
 UnorderedList::UnorderedList(const TokenGroup& contents, bool paragraphMode) {
     if (paragraphMode) {
         // Change each of the text items into paragraphs
-        for (CTokenGroupIter i=contents.begin(), ie=contents.end(); i!=ie; ++i) {
+        for (auto i=contents.cbegin(), ie=contents.cend(); i!=ie; ++i) {
             token::ListItem *item=dynamic_cast<token::ListItem*>((*i).get());
             assert(item!=0);
             item->inhibitParagraphs(false);
@@ -762,6 +763,17 @@ UnorderedList::UnorderedList(const TokenGroup& contents, bool paragraphMode) {
     } else mSubTokens=contents;
 }
 
+void Paragraph::writeAsHtml(std::ostream& out) const {
+    preWrite(out);
+    for (auto i=mSubTokens.cbegin(), ie=mSubTokens.cend(); i!=ie;) {
+        (*i)->writeAsHtml(out);
+        ++i;
+        if (i!=ie && ((*i)->isRawText() || (*i)->isUnmatchedOpenMarker() 
+            || (*i)->isUnmatchedCloseMarker()))
+            out << "\n";
+    }
+    postWrite(out);
+}
 
 
 void BoldOrItalicMarker::writeAsHtml(std::ostream& out) const {

@@ -20,6 +20,7 @@ using std::endl;
 using boost::regex;
 using boost::smatch;
 using boost::regex_match;
+using boost::regex_search;
 
 using boost::optional;
 using boost::none;
@@ -112,7 +113,7 @@ optional<TokenPtr> parseInlineHtml(CTokenGroupIter& i, CTokenGroupIter end) {
         const string& line(*(*i)->text());
 
         bool tag=false, comment=false;
-        optional<HtmlTagInfo> tagInfo=parseHtmlTag(line.begin(), line.end(), cStarts);
+        optional<HtmlTagInfo> tagInfo=parseHtmlTag(line.cbegin(), line.cend(), cStarts);
         if (tagInfo && markdown::token::isValidTag(tagInfo->tagName)>1) {
             tag=true;
         } else if (isHtmlCommentStart(line.begin(), line.end())) {
@@ -123,7 +124,7 @@ optional<TokenPtr> parseInlineHtml(CTokenGroupIter& i, CTokenGroupIter end) {
             // Block continues until an HTML tag (alone) on a line followed by a
             // blank line.
             markdown::TokenGroup contents;
-            CTokenGroupIter firstLine=i, prevLine=i;
+            auto firstLine=i, prevLine=i;
             size_t lines=0;
 
             bool done=false;
@@ -144,7 +145,7 @@ optional<TokenPtr> parseInlineHtml(CTokenGroupIter& i, CTokenGroupIter end) {
                         done=true;
                     } else {
                         const string& text(*(*prevLine)->text());
-                        if (parseHtmlTag(text.begin(), text.end(), cAlone)) done=true;
+                        if (parseHtmlTag(text.cbegin(), text.cend(), cAlone)) done=true;
                     }
                 }
             } while (i!=end && !done);
@@ -163,7 +164,7 @@ optional<TokenPtr> parseInlineHtml(CTokenGroupIter& i, CTokenGroupIter end) {
             // also has to be the last thing on the line, and has to be
             // immediately followed by a blank line too.
             markdown::TokenGroup contents;
-            CTokenGroupIter firstLine=i, prevLine=i;
+            auto firstLine=i, prevLine=i;
 
             bool done=false;
             do {
@@ -305,14 +306,14 @@ bool isCodeFenceEndLine(const string& line, int indent, int openLen, char fence,
 
 size_t countQuoteLevel(const string& prefixString) {
     size_t r=0;
-    for (string::const_iterator qi=prefixString.begin(),
-            qie=prefixString.end(); qi!=qie; ++qi)
+    for (auto qi=prefixString.cbegin(),
+            qie=prefixString.cend(); qi!=qie; ++qi)
         if (*qi=='>') ++r;
     return r;
 }
 
 optional<TokenPtr> parseBlockQuote(CTokenGroupIter& i, CTokenGroupIter end) {
-    static const regex cBlockQuoteExpression("^((?: {0,3}>)+) (.*)$");
+    static const regex cBlockQuoteExpression("^((?: {0,3}>)+) ?(.*)$");
     // Useful captures: 1=prefix, 2=content
 
     if (!(*i)->isBlankLine() && (*i)->text() && (*i)->canContainMarkup()) {
@@ -333,7 +334,7 @@ optional<TokenPtr> parseBlockQuote(CTokenGroupIter& i, CTokenGroupIter end) {
             ++i;
             while (i!=end) {
                 if ((*i)->isBlankLine()) {
-                    CTokenGroupIter ii=i;
+                    auto ii=i;
                     ++ii;
                     if (ii==end) {
                         i=ii;
@@ -406,7 +407,7 @@ optional<TokenPtr> parseListBlock(CTokenGroupIter& i, CTokenGroupIter end, bool 
         }
 
         if (type!=cNone) {
-            CTokenGroupIter originalI=i;
+            auto originalI=i;
             size_t itemCount=1;
             std::ostringstream sub;
             sub << "^" << string(indent, ' ') << " +(([*+-])|([0-9]+\\.)) +.*$";
@@ -439,7 +440,7 @@ optional<TokenPtr> parseListBlock(CTokenGroupIter& i, CTokenGroupIter end, bool 
             ++i;
             while (i!=end) {
                 if ((*i)->isBlankLine()) {
-                    CTokenGroupIter ii=i;
+                    auto ii=i;
                     ++ii;
                     if (ii==end) {
                         i=ii;
@@ -474,7 +475,7 @@ optional<TokenPtr> parseListBlock(CTokenGroupIter& i, CTokenGroupIter end, bool 
                             ++ii;
                             while (ii!=end) {
                                 if ((*ii)->isBlankLine()) {
-                                    CTokenGroupIter iii=ii;
+                                    auto iii=ii;
                                     ++iii;
                                     const string& nextLine(*(*iii)->text());
                                     if (regex_match(nextLine, m, codeBlockAfterBlankLineExpression)) {
@@ -572,7 +573,7 @@ bool parseReference(CTokenGroupIter& i, CTokenGroupIter end, markdown::LinkIds &
             if (m[4].matched) title=m[4];
             else if (m[5].matched) title=m[5];
             else {
-                CTokenGroupIter ii=i;
+                auto ii=i;
                 ++ii;
                 if (ii!=end && (*ii)->text()) {
                     // It could be on the next line
@@ -594,20 +595,17 @@ bool parseReference(CTokenGroupIter& i, CTokenGroupIter end, markdown::LinkIds &
     return false;
 }
 
-void flushParagraph(string& paragraphText, markdown::TokenGroup&
-                    paragraphTokens, markdown::TokenGroup& finalTokens, bool noParagraphs)
+void flushParagraph(markdown::TokenGroup& paragraphTokens,
+                    markdown::TokenGroup& finalTokens, bool noParagraphs)
 {
-    if (!paragraphText.empty()) {
-        paragraphTokens.push_back(TokenPtr(new markdown::token::RawText(paragraphText)));
-        paragraphText.clear();
-    }
-
     if (!paragraphTokens.empty()) {
         if (noParagraphs) {
             if (paragraphTokens.size()>1) {
                 finalTokens.push_back(TokenPtr(new markdown::token::Container(paragraphTokens)));
-            } else finalTokens.push_back(*paragraphTokens.begin());
-        } else finalTokens.push_back(TokenPtr(new markdown::token::Paragraph(paragraphTokens)));
+            } else
+                finalTokens.push_back(*paragraphTokens.begin());
+        } else
+            finalTokens.push_back(TokenPtr(new markdown::token::Paragraph(paragraphTokens)));
         paragraphTokens.clear();
     }
 }
@@ -625,7 +623,7 @@ optional<TokenPtr> parseHeader(CTokenGroupIter& i, CTokenGroupIter end) {
         }
 
         // Underlined type
-        CTokenGroupIter ii=i;
+        auto ii=i;
         ++ii;
         if (ii!=end && !(*ii)->isBlankLine() && (*ii)->text() && (*ii)->canContainMarkup()) {
             static const regex cUnderlinedHeaders("^ {0,3}([-=])\\1* *$");
@@ -826,11 +824,11 @@ void Document::_mergeMultilineHtmlTags() {
     token::Container *tokens=dynamic_cast<token::Container*>(mTokenContainer.get());
     assert(tokens!=0);
 
-    for (TokenGroup::const_iterator i=tokens->subTokens().begin(),
-            ie=tokens->subTokens().end(); i!=ie; ++i)
+    for (auto i=tokens->subTokens().cbegin(),
+            ie=tokens->subTokens().cend(); i!=ie; ++i)
     {
         if ((*i)->text() && regex_match(*(*i)->text(), cHtmlTokenStart)) {
-            TokenGroup::const_iterator i2=i;
+            auto i2=i;
             ++i2;
             if (i2!=tokens->subTokens().end() && (*i2)->text() &&
                     regex_match(*(*i2)->text(), cHtmlTokenEnd))
@@ -887,8 +885,8 @@ void Document::_processBlocksItems(TokenPtr inTokenContainer) {
 
     TokenGroup processed;
 
-    for (TokenGroup::const_iterator ii=tokens->subTokens().begin(),
-            iie=tokens->subTokens().end(); ii!=iie; ++ii)
+    for (auto ii=tokens->subTokens().cbegin(),
+            iie=tokens->subTokens().cend(); ii!=iie; ++ii)
     {
         if ((*ii)->text()) {
             optional<TokenPtr> subitem;
@@ -917,34 +915,35 @@ void Document::_processParagraphLines(TokenPtr inTokenContainer) {
     assert(tokens!=0);
 
     bool noPara=tokens->inhibitParagraphs();
-    for (TokenGroup::const_iterator ii=tokens->subTokens().begin(),
-            iie=tokens->subTokens().end(); ii!=iie; ++ii)
+    for (auto ii=tokens->subTokens().cbegin(),
+            iie=tokens->subTokens().cend(); ii!=iie; ++ii)
         if ((*ii)->isContainer()) _processParagraphLines(*ii);
 
     TokenGroup processed;
     string paragraphText;
     TokenGroup paragraphTokens;
-    for (TokenGroup::const_iterator ii=tokens->subTokens().begin(),
-            iie=tokens->subTokens().end(); ii!=iie; ++ii)
+    for (auto ii=tokens->subTokens().cbegin(),
+            iie=tokens->subTokens().cend(); ii!=iie; ++ii)
     {
         if ((*ii)->text() && (*ii)->canContainMarkup() && !(*ii)->inhibitParagraphs()) {
-            static const regex cExpression("^(.*)  $");
-            if (!paragraphText.empty()) paragraphText+=" ";
+            static const regex cExpression("^(.*?)  +$");
 
             smatch m;
             if (regex_match(*(*ii)->text(), m, cExpression)) {
-                paragraphText += m[1];
-                flushParagraph(paragraphText, paragraphTokens, processed, noPara);
-                processed.push_back(TokenPtr(new markdown::token::HtmlTag("br/")));
-            } else paragraphText += *(*ii)->text();
+                paragraphTokens.push_back(TokenPtr(new markdown::token::RawText(m.str(1))));
+                auto after = ii;
+                if (++after != iie)
+                    paragraphTokens.push_back(TokenPtr(new markdown::token::HtmlTag("br /")));
+            } else 
+                paragraphTokens.push_back(TokenPtr(new markdown::token::RawText(*(*ii)->text())));
         } else {
-            flushParagraph(paragraphText, paragraphTokens, processed, noPara);
+            flushParagraph(paragraphTokens, processed, noPara);
             processed.push_back(*ii);
         }
     }
 
     // Make sure the last paragraph is properly flushed too.
-    flushParagraph(paragraphText, paragraphTokens, processed, noPara);
+    flushParagraph(paragraphTokens, processed, noPara);
 
     tokens->swapSubtokens(processed);
 }

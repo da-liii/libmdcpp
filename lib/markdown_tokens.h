@@ -82,6 +82,9 @@ public:
     virtual bool isMatchedCloseMarker() const {
         return false;
     }
+    virtual bool isRawText() const {
+        return false;
+    }
     virtual bool inhibitParagraphs() const {
         return false;
     }
@@ -127,9 +130,12 @@ class RawText: public TextHolder {
 public:
     RawText(const string& text, bool canContainMarkup=true):
         TextHolder(text, canContainMarkup, cAmps|cAngles|cQuotes) { }
-
+        
     virtual void writeToken(std::ostream& out) const {
         out << "RawText: " << *text() << '\n';
+    }
+    virtual bool isRawText() const {
+        return true;
     }
 
     virtual optional<TokenGroup> processSpanElements(const LinkIds& idTable);
@@ -469,6 +475,7 @@ public:
     Paragraph() { }
     Paragraph(const TokenGroup& contents): Container(contents) { }
 
+    virtual void writeAsHtml(std::ostream& out) const override;
     virtual TokenPtr clone(const TokenGroup& newContents) const {
         return TokenPtr(new Paragraph(newContents));
     }
@@ -481,7 +488,7 @@ protected:
         out << "<p>";
     }
     virtual void postWrite(std::ostream& out) const {
-        out << "</p>\n\n";
+        out << "</p>\n";
     }
 };
 
