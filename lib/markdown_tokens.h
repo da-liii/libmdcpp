@@ -51,7 +51,7 @@ public:
         out << string(indent*2, ' ');
         writeToken(out);
     }
-
+    
     virtual optional<TokenGroup> processSpanElements(const LinkIds& idTable)
     {
         return none;
@@ -247,13 +247,17 @@ public:
     BlankLine(const string& actualContents=string()):
         TextHolder(actualContents, false, 0) { }
 
-    virtual void writeToken(std::ostream& out) const {
+    virtual void writeToken(std::ostream& out) const override {
         out << "BlankLine: " << *text() << '\n';
     }
 
-    virtual bool isBlankLine() const {
+    virtual bool isBlankLine() const override {
         return true;
     }
+    
+protected:
+    virtual void preWrite(std::ostream& out) const override {}
+    virtual void postWrite(std::ostream& out) const override {}
 };
 
 
@@ -457,7 +461,7 @@ public:
     virtual TokenPtr clone(const TokenGroup& newContents) const {
         return TokenPtr(new BlockQuote(newContents));
     }
-    virtual string containerName() const {
+    virtual string containerName() const override {
         return "BlockQuote";
     }
 
@@ -466,7 +470,7 @@ protected:
         out << "<blockquote>\n";
     }
     virtual void postWrite(std::ostream& out) const {
-        out << "\n</blockquote>\n";
+        out << "</blockquote>\n";
     }
 };
 

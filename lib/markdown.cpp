@@ -313,7 +313,7 @@ size_t countQuoteLevel(const string& prefixString) {
     return r;
 }
 
-optional<TokenPtr> parseBlockQuote(CTokenGroupIter& i, CTokenGroupIter end) {
+bool parseBlockQuote(markdown::TokenGroup& subTokens,CTokenGroupIter& i, CTokenGroupIter end) {
     static const regex cBlockQuoteExpression("^((?: {0,3}>)+) ?(.*)$");
     // Useful captures: 1=prefix, 2=content
 
@@ -324,47 +324,31 @@ optional<TokenPtr> parseBlockQuote(CTokenGroupIter& i, CTokenGroupIter end) {
             size_t quoteLevel=countQuoteLevel(m[1]);
             regex continuationExpression=regex("^((?: {0,3}>){"+boost::lexical_cast<string>(quoteLevel)+"}) ?(.*)$");
 
-            markdown::TokenGroup subTokens;
-            subTokens.push_back(TokenPtr(new markdown::token::RawText(m[2])));
-
-            // The next line can be a continuation of this quote (with or
-            // without the prefix string) or a blank line. Blank lines are
-            // treated as part of this quote if the following line is a
-            // properly-prefixed quote line too, otherwise they terminate the
-            // quote.
+            if (!isBlankLine(m[2]))
+                subTokens.push_back(TokenPtr(new markdown::token::RawText(m[2])));
+            else
+                subTokens.push_back(TokenPtr(new markdown::token::BlankLine(m[2])));
+            
             ++i;
             while (i!=end) {
-                if ((*i)->isBlankLine()) {
-                    auto ii=i;
-                    ++ii;
-                    if (ii==end) {
-                        i=ii;
-                        break;
-                    } else {
-                        const string& line(*(*ii)->text());
-                        if (regex_match(line, m, continuationExpression)) {
-                            if (m[1].matched && m[1].length()>0) {
-                                i=++ii;
-                                subTokens.push_back(TokenPtr(new markdown::token::BlankLine));
-                                subTokens.push_back(TokenPtr(new markdown::token::RawText(m[2])));
-                            } else break;
-                        } else break;
-                    }
+                const string& line(*(*i)->text());
+                if (regex_match(line, m, continuationExpression)) {
+                    assert(m[2].matched);
+                    if (!isBlankLine(m[2]))
+                        subTokens.push_back(TokenPtr(new markdown::token::RawText(m[2])));
+                    else
+                        subTokens.push_back(TokenPtr(new markdown::token::BlankLine(m[2])));
+                    ++i;
                 } else {
-                    const string& line(*(*i)->text());
-                    if (regex_match(line, m, continuationExpression)) {
-                        assert(m[2].matched);
-                        if (!isBlankLine(m[2])) subTokens.push_back(TokenPtr(new markdown::token::RawText(m[2])));
-                        else subTokens.push_back(TokenPtr(new markdown::token::BlankLine(m[2])));
-                        ++i;
-                    } else break;
+                    //--i;
+                    break;
                 }
             }
 
-            return TokenPtr(new markdown::token::BlockQuote(subTokens));
+            return true;
         }
     }
-    return none;
+    return false;
 }
 
 optional<TokenPtr> parseListBlock(CTokenGroupIter& i, CTokenGroupIter end, bool sub=false) {
@@ -885,36 +869,128 @@ void Document::_processBlocksItems(TokenPtr inTokenContainer) {
     assert(tokens!=0);
 
     TokenGroup processed;
+    TokenGroup accu;
     bool isPrevParagraph = false;
+    bool isBlockQuote = false;
+    bool isPrevBlockQuote = false;
+    bool isPrevBlankLine = false;
 
     for (auto ii=tokens->subTokens().cbegin(),
             iie=tokens->subTokens().cend(); ii!=iie; ++ii)
     {
+        int status(0);
+        optional<TokenPtr> subitem, blockQuoteToken;
         if ((*ii)->text()) {
-            optional<TokenPtr> subitem;
-            if (!subitem) subitem=parseHeader(ii, iie);
-            if (!subitem) subitem=parseHorizontalRule(ii, iie);
-            if (!subitem) subitem=parseListBlock(ii, iie);
-            if (!subitem) subitem=parseBlockQuote(ii, iie);
-            if (!subitem && !isPrevParagraph)
-                subitem=parseCodeBlock(ii, iie);
+            isBlockQuote = parseBlockQuote(accu, ii, iie);
+            
+            if (ii != iie) {
+                subitem=parseHorizontalRule(ii, iie);
+                if (!subitem) subitem=parseListBlock(ii, iie);
+                if (!subitem) subitem=parseHeader(ii, iie);
+                if (!subitem && !isPrevParagraph)
+                    subitem=parseCodeBlock(ii, iie);
+            }
 
-            if (subitem) {
+            if (isBlockQuote) {
+                if (subitem) status = 1;
+                else if (ii != iie) status = 2;
+                else status = 3;
+            } else {
+                if (subitem) status = 4;
+                else status = 5;
+            }
+        } else if ((*ii)->isContainer())
+            status = 6;
+        
+        switch (status) {
+            case 1:
+                blockQuoteToken = TokenPtr(new markdown::token::BlockQuote(accu));
+                _processBlocksItems(*blockQuoteToken);
+                processed.push_back(*blockQuoteToken);
+                accu.clear();
+                
                 _processBlocksItems(*subitem);
                 processed.push_back(*subitem);
+                isPrevBlockQuote = false;
                 isPrevParagraph = false;
-                if (ii==iie) break;
-                continue;
-            } else {
+                break;
+                
+            case 2:
+                isPrevBlankLine = (*ii)->isBlankLine();
+                if (!isPrevBlankLine)
+                    accu.push_back(*ii);
+                ++ii;
+                if (isPrevBlankLine || ii == iie) {
+                    blockQuoteToken = TokenPtr(new markdown::token::BlockQuote(accu));
+                    _processBlocksItems(*blockQuoteToken);
+                    processed.push_back(*blockQuoteToken);
+                    accu.clear();
+                }
+                --ii;
+                isPrevBlockQuote = !isPrevBlankLine;
+                isPrevParagraph = false;
+                break;
+                
+            case 3:
+                blockQuoteToken = TokenPtr(new markdown::token::BlockQuote(accu));
+                _processBlocksItems(*blockQuoteToken);
+                processed.push_back(*blockQuoteToken);
+                assert(ii==iie);
+                break;
+                
+            case 4:
+                if (isPrevBlockQuote) {
+                    blockQuoteToken = TokenPtr(new markdown::token::BlockQuote(accu));
+                    _processBlocksItems(*blockQuoteToken);
+                    processed.push_back(*blockQuoteToken);
+                    accu.clear();
+                }
+                _processBlocksItems(*subitem);
+                processed.push_back(*subitem);
+                isPrevBlockQuote = false;
+                isPrevParagraph = false;
+                break;
+                
+            case 5:
+                if (isPrevBlockQuote) {
+                    isPrevBlankLine = (*ii)->isBlankLine();
+                    if (!isPrevBlankLine)
+                        accu.push_back(*ii);
+                    ++ii;
+                    if (isPrevBlankLine || ii == iie) {
+                        blockQuoteToken = TokenPtr(new markdown::token::BlockQuote(accu));
+                        _processBlocksItems(*blockQuoteToken);
+                        processed.push_back(*blockQuoteToken);
+                        accu.clear();
+                    }
+                    --ii;
+                    isPrevBlockQuote = !isPrevBlankLine;
+                    isPrevParagraph = false;
+                } else {
+                    processed.push_back(*ii);
+                    isPrevBlockQuote = false;
+                    isPrevParagraph = true;
+                }
+                break;
+                
+            case 6:
+                if (isPrevBlockQuote) {
+                    blockQuoteToken = TokenPtr(new markdown::token::BlockQuote(accu));
+                    _processBlocksItems(*blockQuoteToken);
+                    processed.push_back(*blockQuoteToken);
+                    accu.clear();
+                }
+                _processBlocksItems(*ii);
                 processed.push_back(*ii);
-                isPrevParagraph = true;
-            }
-        } else if ((*ii)->isContainer()) {
-            _processBlocksItems(*ii);
-            processed.push_back(*ii);
-            isPrevParagraph = false;
-        }
-    }
+                isPrevParagraph = false;
+                isPrevBlockQuote = false;
+                break;
+            default:
+                break;
+        } // end of switch
+        if (ii == iie)
+            break;
+    } // end of for loop
     tokens->swapSubtokens(processed);
 }
 
