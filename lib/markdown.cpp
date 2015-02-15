@@ -952,8 +952,8 @@ void Document::_processBlocksItems(TokenPtr inTokenContainer) {
                 break;
                 
             case 5:
+                isPrevBlankLine = (*ii)->isBlankLine();
                 if (isPrevBlockQuote) {
-                    isPrevBlankLine = (*ii)->isBlankLine();
                     if (!isPrevBlankLine)
                         accu.push_back(*ii);
                     ++ii;
@@ -969,7 +969,7 @@ void Document::_processBlocksItems(TokenPtr inTokenContainer) {
                 } else {
                     processed.push_back(*ii);
                     isPrevBlockQuote = false;
-                    isPrevParagraph = true;
+                    isPrevParagraph = !isPrevBlankLine;
                 }
                 break;
                 
