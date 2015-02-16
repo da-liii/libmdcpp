@@ -429,7 +429,7 @@ protected:
         out << "\n<ul>\n";
     }
     virtual void postWrite(std::ostream& out) const {
-        out << "</ul>\n\n";
+        out << "</ul>\n";
     }
 };
 
@@ -450,7 +450,7 @@ protected:
         out << "<ol>\n";
     }
     virtual void postWrite(std::ostream& out) const {
-        out << "</ol>\n\n";
+        out << "</ol>\n";
     }
 };
 

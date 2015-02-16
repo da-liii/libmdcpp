@@ -351,197 +351,109 @@ bool parseBlockQuote(markdown::TokenGroup& subTokens,CTokenGroupIter& i, CTokenG
     return false;
 }
 
-optional<TokenPtr> parseListBlock(CTokenGroupIter& i, CTokenGroupIter end, bool sub=false) {
-    static const regex cUnorderedListExpression("^( *)([*+-]) +([^*-].*)$");
-    static const regex cOrderedListExpression("^( *)([0-9]+)\\. +(.*)$");
-
-    enum ListType { cNone, cUnordered, cOrdered };
-    ListType type=cNone;
+optional<TokenPtr> parseListBlock(CTokenGroupIter& i, CTokenGroupIter& end) {
+    static const regex cUnorderedListExpression("^( {0,3})([*+-])( +)([^*-].*)$");
+    static const regex cOrderedListExpression("^( {0,3})([0-9]+)([.)])( +)(.*)$");
+    
+    enum ListType {cNone, cUnordered, cOrdered};
+    ListType type = cNone;
     if (!(*i)->isBlankLine() && (*i)->text() && (*i)->canContainMarkup()) {
-        regex nextItemExpression, startSublistExpression;
-        size_t indent=0;
-
-        const string& line(*(*i)->text());
-
-        //cerr << "IsList? " << line << endl;
-
-        markdown::TokenGroup subTokens, subItemTokens;
-
+        bool isLooseOrTight = false;
+        regex nextItemExpression, nextContentExpression;
+        size_t indent = 0;
+        const string& firstLine(*(*i)->text());
+        markdown::TokenGroup contentTokens, itemTokens;
+        std::ostringstream next;
+        
         smatch m;
-        if (regex_match(line, m, cUnorderedListExpression)) {
-            indent=m[1].length();
-            if (sub || indent<4) {
-                type=cUnordered;
-                char startChar=*m[2].first;
-                subItemTokens.push_back(TokenPtr(new markdown::token::RawText(m[3])));
-
-                std::ostringstream next;
-                next << "^" << string(indent, ' ') << "\\" << startChar << " +([^*-].*)$";
-                nextItemExpression=next.str();
-            }
-        } else if (regex_match(line, m, cOrderedListExpression)) {
-            indent=m[1].length();
-            if (sub || indent<4) {
-                type=cOrdered;
-                subItemTokens.push_back(TokenPtr(new markdown::token::RawText(m[3])));
-
-                std::ostringstream next;
-                next << "^" << string(indent, ' ') << "[0-9]+\\. +(.*)$";
-                nextItemExpression=next.str();
-            }
+        if (regex_match(firstLine, m, cUnorderedListExpression)) {
+            type = cUnordered;
+            char startChar = *m[2].first;
+            indent = m[1].length() + m[3].length() + 1;
+            contentTokens.push_back(TokenPtr(new markdown::token::RawText(m[4].str())));
+            
+            next << "^( {0,3})" << startChar << "( +)(.*)$";
+            nextItemExpression = next.str();
+            next.str("");
+            next.clear();
+        } else if (regex_match(firstLine, m, cOrderedListExpression)) {
+            type = cOrdered;
+            char startChar = *m[3].first;
+            indent = m[1].length() + m[2].length() + m[4].length() + 1;
+            contentTokens.push_back(TokenPtr(new markdown::token::RawText(m[5].str())));
+            
+            next << "^( {0,3}[0-9]+)\\" << startChar << "( +)(.*)$";
+            nextItemExpression = next.str();
+            next.str("");
+            next.clear();
         }
-
-        if (type!=cNone) {
-            auto originalI=i;
-            size_t itemCount=1;
-            std::ostringstream sub;
-            sub << "^" << string(indent, ' ') << " +(([*+-])|([0-9]+\\.)) +.*$";
-            startSublistExpression=sub.str();
-
-            // There are several options for the next line. It's another item in
-            // this list (in which case this one is done); it's a continuation
-            // of this line (collect it and keep going); it's the first item in
-            // a sub-list (call this function recursively to collect it), it's
-            // the next item in the parent list (this one is ended); or it's
-            // blank.
-            //
-            // A blank line requires looking ahead. If the next line is an item
-            // for this list, then switch this list into paragraph-items mode
-            // and continue processing. If it's indented by four or more spaces
-            // (more than the list itself), then it's another continuation of
-            // the current item. Otherwise it's either a new paragraph (and this
-            // list is ended) or the beginning of a sub-list.
-            static const regex cContinuedItemExpression("^ *([^ ].*)$");
-
-            regex continuedAfterBlankLineExpression("^ {"+
-                                                    boost::lexical_cast<string>(indent+4)+"}([^ ].*)$");
-            regex codeBlockAfterBlankLineExpression("^ {"+
-                                                    boost::lexical_cast<string>(indent+8)+"}(.*)$");
-
-            enum NextItemType { cUnknown, cEndOfList, cAnotherItem };
-            NextItemType nextItem=cUnknown;
-            bool setParagraphMode=false;
-
-            ++i;
-            while (i!=end) {
-                if ((*i)->isBlankLine()) {
-                    auto ii=i;
-                    ++ii;
-                    if (ii==end) {
-                        i=ii;
-                        nextItem=cEndOfList;
-                    } else if ((*ii)->text()) {
-                        const string& line(*(*ii)->text());
-                        if (regex_match(line, startSublistExpression)) {
-                            setParagraphMode=true;
-                            ++itemCount;
-                            i=ii;
-                            optional<TokenPtr> p=parseListBlock(i, end, true);
-                            assert(p);
-                            subItemTokens.push_back(*p);
-                            continue;
-                        } else if (regex_match(line, m, nextItemExpression)) {
-                            setParagraphMode=true;
-                            i=ii;
-                            nextItem=cAnotherItem;
-                        } else if (regex_match(line, m, continuedAfterBlankLineExpression)) {
-                            assert(m[1].matched);
-                            subItemTokens.push_back(TokenPtr(new markdown::token::BlankLine()));
-                            subItemTokens.push_back(TokenPtr(new markdown::token::RawText(m[1])));
-                            i=++ii;
-                            continue;
-                        } else if (regex_match(line, m, codeBlockAfterBlankLineExpression)) {
-                            setParagraphMode=true;
-                            ++itemCount;
-                            assert(m[1].matched);
-                            subItemTokens.push_back(TokenPtr(new markdown::token::BlankLine()));
-
-                            string codeBlock = m.str(1)+'\n';
-                            ++ii;
-                            while (ii!=end) {
-                                if ((*ii)->isBlankLine()) {
-                                    auto iii=ii;
-                                    ++iii;
-                                    const string& nextLine(*(*iii)->text());
-                                    if (regex_match(nextLine, m, codeBlockAfterBlankLineExpression)) {
-                                        codeBlock += '\n'+m.str(1)+'\n';
-                                        ii=iii;
-                                    } else break;
-                                } else if ((*ii)->text()) {
-                                    const string& line(*(*ii)->text());
-                                    if (regex_match(line, m, codeBlockAfterBlankLineExpression)) {
-                                        codeBlock += m.str(1)+'\n';
-                                    } else break;
-                                } else break;
-                                ++ii;
-                            }
-
-                            subItemTokens.push_back(TokenPtr(new markdown::token::CodeBlock(codeBlock)));
-                            i=ii;
-                            continue;
-                        } else {
-                            nextItem=cEndOfList;
-                        }
-                    } else break;
-                } else if ((*i)->text()) {
-                    const string& line(*(*i)->text());
-                    if (regex_match(line, startSublistExpression)) {
-                        ++itemCount;
-                        optional<TokenPtr> p=parseListBlock(i, end, true);
-                        assert(p);
-                        subItemTokens.push_back(*p);
-                        continue;
-                    } else if (regex_match(line, m, nextItemExpression)) {
-                        nextItem=cAnotherItem;
-                    } else {
-                        if (regex_match(line, m, cUnorderedListExpression)
-                                || regex_match(line, m, cOrderedListExpression))
-                        {
-                            // Belongs to the parent list
-                            nextItem=cEndOfList;
-                        } else {
-                            regex_match(line, m, cContinuedItemExpression);
-                            assert(m[1].matched);
-                            subItemTokens.push_back(TokenPtr(new markdown::token::RawText(m[1])));
-                            ++i;
-                            continue;
-                        }
-                    }
-                } else nextItem=cEndOfList;
-
-                if (!subItemTokens.empty()) {
-                    subTokens.push_back(TokenPtr(new markdown::token::ListItem(subItemTokens)));
-                    subItemTokens.clear();
-                }
-
-                assert(nextItem!=cUnknown);
-                if (nextItem==cAnotherItem) {
-                    subItemTokens.push_back(TokenPtr(new markdown::token::RawText(m[1])));
-                    ++itemCount;
+        
+        if (type == cNone)
+            return none;
+        next << "^ {" << indent << "}(.*)$";
+        nextContentExpression = next.str();
+        next.str("");
+        next.clear();
+        ++i;
+        bool isPrevBlankLine = false;
+        while (i != end) {
+            if (!(*i)->text())
+                break;
+            if ((*i)->isBlankLine()) {
+                auto ii = i;
+                ++ii;
+                if (ii == end)
+                    break;
+                if ((*ii)->isBlankLine()) { // skip this Blank Line
                     ++i;
-                } else { // nextItem==cEndOfList
                     break;
                 }
+                ++i;
+                isPrevBlankLine = true;
+                continue;
             }
-
-            // In case we hit the end with an unterminated item...
-            if (!subItemTokens.empty()) {
-                subTokens.push_back(TokenPtr(new markdown::token::ListItem(subItemTokens)));
-                subItemTokens.clear();
+            
+            const string& line(*(*i)->text());
+            if (regex_match(line, m, nextContentExpression)) {
+                if (isPrevBlankLine)
+                    contentTokens.push_back(TokenPtr(new markdown::token::BlankLine()));
+                contentTokens.push_back(TokenPtr(new markdown::token::RawText(m[1].str())));
+                ++i;
+                // if one of the items directly contains two block-level
+                // elements with a blank line between them, the lists are loose
+                isLooseOrTight |= isPrevBlankLine;
+                isPrevBlankLine = false;
+                continue;
             }
-
-            if (itemCount>1 || indent!=0) {
-                if (type==cUnordered) {
-                    return TokenPtr(new markdown::token::UnorderedList(subTokens, setParagraphMode));
-                } else {
-                    return TokenPtr(new markdown::token::OrderedList(subTokens, setParagraphMode));
-                }
-            } else {
-                // It looked like a list, but turned out to be a false alarm.
-                i=originalI;
-                return none;
+            if (regex_match(line, m, nextItemExpression)) {
+                itemTokens.push_back(TokenPtr(new markdown::token::ListItem(contentTokens)));
+                contentTokens.clear();
+                contentTokens.push_back(TokenPtr(new markdown::token::RawText(m[3].str())));
+                indent = m[1].length() + m[2].length() + 1;
+                next << "^ {" << indent << "}(.*)$";
+                nextContentExpression = next.str();
+                next.str("");
+                next.clear();
+                ++i;
+                // if a blank line is between two of the list items
+                // the lists are loose
+                isLooseOrTight |= isPrevBlankLine;
+                isPrevBlankLine = false;
+                continue;
             }
-        }
+            
+            // not matched any above, which indicates a stop of the List
+            --i;
+            break;
+        } // end of while loop
+        assert(!contentTokens.empty());
+        itemTokens.push_back(TokenPtr(new markdown::token::ListItem(contentTokens)));
+        contentTokens.clear();
+        
+        if (type == cUnordered)
+            return TokenPtr(new markdown::token::UnorderedList(itemTokens, isLooseOrTight));
+        else if (type == cOrdered)
+            return TokenPtr(new markdown::token::OrderedList(itemTokens, isLooseOrTight));
     }
     return none;
 }

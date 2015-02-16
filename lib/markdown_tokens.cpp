@@ -680,7 +680,7 @@ HtmlAnchorTag::HtmlAnchorTag(const string& url, const string& title):
 void CodeBlock::writeAsHtml(std::ostream& out) const {
     out << "<pre><code>";
     TextHolder::writeAsHtml(out);
-    out << "</code></pre>\n\n";
+    out << "</code></pre>\n";
 }
 
 void FencedCodeBlock::writeAsHtml(std::ostream& out) const
