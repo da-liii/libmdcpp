@@ -479,31 +479,40 @@ TokenGroup RawText::_processBoldAndItalicSpans(const string& src,
         ReplacementTable& replacements)
 {
     static const regex cEmphasisExpression(
-        "(?:(?<![*_])([*_]{1,3})([^*_ ]+?)\\1(?![*_]))"                                    // Mid-word emphasis
-        "|((?:(?<!\\*)\\*{1,3}(?!\\*)|(?<!_)_{1,3}(?!_))(?=.)(?! )(?![.,:;] )(?![.,:;]$))" // Open
-        "|((?<![* ])\\*{1,3}(?!\\*)|(?<![ _])_{1,3}(?!_))"                                 // Close
+        "((?:(?<!\\*)\\*{1,3}|(?<!_)_{1,3})(?=.)(?! )(?![[:punct:]]))"      // Open
+        "|((?<! )(?<![[:punct:]])(?:\\*{1,3}(?!\\*)|_{1,3}(?!_)))"          // Close
+        "|(?:(?<!\\*)(\\*{1,3})((?![[:punct:]])(?! ).+?)\\1(?!\\*))"        // Mid-word emphasis for *
+        "|(?:(?<=[[:punct:]])(?<!_)(_{1,3})((?![[:punct:]]))(?! ).+?\\1(?=[[:punct:]])(?!_))" // Mid-word emphasis for *
     );
 
     TokenGroup tgt;
-    string::const_iterator i=src.begin(), end=src.end(), prev=i;
+    auto i=src.cbegin(), end=src.cend(), prev=i;
 
-    while (1) {
+    while (true) {
         smatch m;
         if (regex_search(prev, end, m, cEmphasisExpression)) {
-            if (prev!=m[0].first) tgt.push_back(TokenPtr(new
-                                                    RawText(string(prev, m[0].first))));
-            if (m[3].matched) {
-                string token=m[3];
+            if (prev!=m[0].first)
+                tgt.push_back(TokenPtr(new RawText(string(prev, m[0].first))));
+            if (m[1].matched) {
+                string token=m[1];
                 tgt.push_back(TokenPtr(new BoldOrItalicMarker(true, token[0],
                                        token.length())));
                 prev=m[0].second;
-            } else if (m[4].matched) {
-                string token=m[4];
+            } else if (m[2].matched) {
+                string token=m[2];
+                tgt.push_back(TokenPtr(new BoldOrItalicMarker(false, token[0],
+                                       token.length())));
+                prev=m[0].second;
+            } else if (m[3].matched && m[4].matched) {
+                string token=m[3], contents=m[4];
+                tgt.push_back(TokenPtr(new BoldOrItalicMarker(true, token[0],
+                                       token.length())));
+                tgt.push_back(TokenPtr(new RawText(string(contents))));
                 tgt.push_back(TokenPtr(new BoldOrItalicMarker(false, token[0],
                                        token.length())));
                 prev=m[0].second;
             } else {
-                string token=m[1], contents=m[2];
+                string token=m[5], contents=m[6];
                 tgt.push_back(TokenPtr(new BoldOrItalicMarker(true, token[0],
                                        token.length())));
                 tgt.push_back(TokenPtr(new RawText(string(contents))));
