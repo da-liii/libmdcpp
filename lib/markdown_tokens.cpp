@@ -119,15 +119,15 @@ bool looksLikeEmailAddress(const string& str) {
     typedef string::const_iterator Iter;
     typedef string::const_reverse_iterator RIter;
     Iter i=std::find_if(str.begin(), str.end(), notValidNameCharacter);
-    if (i!=str.end() && *i=='@' && i!=str.begin()) {
+    if (i!=str.cend() && *i=='@' && i!=str.cbegin()) {
         // The name part is valid.
-        i=std::find_if(i+1, str.end(), notValidSiteCharacter);
+        i=std::find_if(i+1, str.cend(), notValidSiteCharacter);
         if (i==str.end()) {
             // The site part doesn't contain any invalid characters.
-            RIter ri=std::find_if(str.rbegin(), str.rend(), isNotAlpha);
-            if (ri!=str.rend() && *ri=='.') {
+            RIter ri=std::find_if(str.crbegin(), str.crend(), isNotAlpha);
+            if (ri!=str.crend() && *ri=='.') {
                 // It ends with a dot and only alphabetic characters.
-                size_t d=std::distance(ri.base(), str.end());
+                size_t d=std::distance(ri.base(), str.cend());
                 if (d>=2 && d<=4) {
                     // There are two-to-four of them. It's valid.
                     return true;
@@ -241,8 +241,8 @@ string RawText::_processHtmlTagAttributes(string src, ReplacementTable&
 {
     // Because "Attribute Content Is Not A Code Span"
     string tgt;
-    string::const_iterator prev=src.begin(), end=src.end();
-    while (1) {
+    auto prev=src.cbegin(), end=src.cend();
+    while (true) {
         static const regex cHtmlToken("<((/?)([a-zA-Z0-9]+)(?:( +[a-zA-Z0-9]+?(?: ?= ?(\"|').*?\\5))+? */? *))>");
         smatch m;
         if (regex_search(prev, end, m, cHtmlToken)) {
@@ -253,7 +253,7 @@ string RawText::_processHtmlTagAttributes(string src, ReplacementTable&
                 tgt+=string(prev, m[0].first);
 
                 string fulltag=m[0], tgttag;
-                string::const_iterator prevtag=fulltag.begin(), endtag=fulltag.end();
+                auto prevtag=fulltag.cbegin(), endtag=fulltag.cend();
                 while (1) {
                     static const regex cAttributeStrings("= ?(\"|').*?\\1");
                     smatch mtag;
@@ -310,8 +310,8 @@ string RawText::_processCodeSpans(string src, ReplacementTable&
 
 string RawText::_processEscapedCharacters(const string& src) {
     string tgt;
-    string::const_iterator prev=src.begin(), end=src.end();
-    while (1) {
+    auto prev=src.cbegin(), end=src.cend();
+    while (true) {
         string::const_iterator i=std::find(prev, end, '\\');
         if (i!=end) {
             tgt+=string(prev, i);
@@ -339,7 +339,7 @@ string RawText::_processSpaceBracketedGroupings(const string &src,
     static const regex cRemove("(?:(?: \\*+ )|(?: _+ ))");
 
     string tgt;
-    string::const_iterator prev=src.begin(), end=src.end();
+    auto prev=src.cbegin(), end=src.cend();
     while (1) {
         smatch m;
         if (regex_search(prev, end, m, cRemove)) {
@@ -384,7 +384,7 @@ string RawText::_processLinksImagesAndTags(const string &src,
     // contents, 8=actual tag from 7.
 
     string tgt;
-    string::const_iterator prev=src.begin(), end=src.end();
+    auto prev=src.cbegin(), end=src.cend();
     while (1) {
         smatch m;
         if (regex_search(prev, end, m, cExpression)) {

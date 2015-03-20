@@ -61,7 +61,7 @@ optional<HtmlTagInfo> parseHtmlTag(string::const_iterator begin,
 
 markdown::TokenGroup parseInlineHtmlText(const string& src) {
     markdown::TokenGroup r;
-    string::const_iterator prev=src.begin(), end=src.end();
+    auto prev=src.cbegin(), end=src.cend();
     while (1) {
         smatch m;
         if (regex_search(prev, end, m, cHtmlTokenExpression)) {
