@@ -5,15 +5,16 @@ A markdown implementation forked from [cpp-markdown](http://sourceforge.net/proj
 It is intended for [KMarkNote](https://github.com/sadhen/KMarkNote).
 
 ## Install
-First of all, you need to install the dependencies. In debian, just
+First of all, you need to install the dependencies. In **Debian Sid**, just
 ```
-sudo apt-get install cmake libboost-all-dev
+sudo apt-get install g++ cmake libboost-all-dev
 ```
 
 Then compile and install
 ```
-cd libmdcpp
-mkdir build
+git clone https://github.com/sadhen/libmdcpp
+cd libmdcpp/
+mkdir build && cd build/
 # if you do not specify CMAKE_INSTALL_PREFIX
 # the library will be installed in /usr/local
 cmake -DCMAKE_INSTALL_PREFIX=/usr ..
