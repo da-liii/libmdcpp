@@ -1,11 +1,12 @@
 /*
 	Copyright (c) 2009 by Chad Nelson
+		      2015 by Darcy Shen
 	Released under the MIT License.
 	See the provided LICENSE.TXT file for details.
 */
 
-#ifndef LIBMDCPP_H_INCLUDED
-#define LIBMDCPP_H_INCLUDED
+#ifndef MARKDOWN_H_INCLUDED
+#define MARKDOWN_H_INCLUDED
 
 #include <iostream>
 #include <string>
@@ -15,6 +16,8 @@
 
 #include <boost/noncopyable.hpp>
 #include <boost/optional.hpp>
+
+#include "libmdcpp.h"
 
 using std::string;
 
@@ -31,27 +34,19 @@ typedef std::shared_ptr<Token> TokenPtr;
 typedef std::list<TokenPtr> TokenGroup;
 typedef TokenGroup::const_iterator CTokenGroupIter;
 
-class SyntaxHighlighter {
-public:
-    SyntaxHighlighter() {}
-    virtual ~SyntaxHighlighter() {}
-    virtual void highlight(const string& code, const string lang, std::ostream& out) {
-        out << code;
-    }
-};
 
-class Document: private boost::noncopyable {
+class Document: public Dokumento, private boost::noncopyable {
 public:
-    Document(SyntaxHighlighter* highlighter, size_t spacesPerTab=cDefaultSpacesPerTab);
-    Document(std::istream& in, SyntaxHighlighter* highlighter, size_t spacesPerTab=cDefaultSpacesPerTab);
+    Document(SyntaxHighlighter *highlighter, size_t spacesPerTab=cDefaultSpacesPerTab);
+    Document(std::istream& in, SyntaxHighlighter *highlighter, size_t spacesPerTab=cDefaultSpacesPerTab);
     ~Document();
 
     // You can call read() functions multiple times before writing if
     // desirable. Once the document has been processed for writing, it can't
     // accept any more input.
-    bool read(const string&);
-    bool read(std::istream&);
-    void write(std::ostream&);
+    bool read(const string&) override;
+    bool read(std::istream&) override;
+    void write(std::ostream&) override;
     void writeTokens(std::ostream&); // For debugging
 
     // The class is marked noncopyable because it uses reference-counted

@@ -15,6 +15,7 @@
 //#include <boost/regex.hpp> // For the 'test' option
 
 #include "../lib/markdown.h"
+#include "../lib/libmdcpp.h"
 
 using std::cerr;
 using std::cout;
@@ -128,7 +129,7 @@ int main(int argc, char *argv[]) {
 		} else in=&ifile;
 	} else cerr << "Reading standard input..." << endl;
 
-    markdown::SyntaxHighlighter highlighter;
+        SyntaxHighlighter highlighter;
 	markdown::Document doc(&highlighter);
 	doc.read(*in);
 
