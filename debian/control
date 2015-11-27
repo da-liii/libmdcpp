@@ -1,0 +1,45 @@
+Source: libmdcpp
+Priority: optional
+Maintainer: Darcy Shen <sadhen@zoho.com>
+Build-Depends: debhelper (>= 9), cmake
+Standards-Version: 3.9.6
+Section: libs
+Homepage: https://github.com/sadhen/libmdcpp
+#Vcs-Git: git://anonscm.debian.org/collab-maint/libmdcpp.git
+#Vcs-Browser: https://anonscm.debian.org/gitweb/?p=collab-maint/libmdcpp.git;a=summary
+
+#Package: mdcpp
+#Architecture: any
+#Depends: ${shlibs:Depends}, ${misc:Depends}, libmdcpp (= ${binary:Version})
+#Description: implementation of the CommanMark markup language in C++
+# mdcpp is an implementation of the CommanMark markup language in C++.
+# This package provides the mdcpp excutables.
+
+Package: libmdcpp
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: implementation of the CommonMark markup language in C++ (library)
+ mdcpp is an implementation of the CommanMark markup language in C++.
+ This package provides the lib files.
+
+Package: libmdcpp-dev
+Section: libdevel
+Architecture: any
+Depends: libmdcpp (= ${binary:Version}), ${misc:Depends}
+Description: implementation of the CommonMark markup language in C++ (dev files)
+ mdcpp is an implementation of the CommanMark markup language in C++.
+ This package provides the dev files.
+
+#Package: libmarkdown2-dbg
+#Priority: extra
+#Section: debug
+#Architecture: any
+#Depends: ${misc:Depends}, libmarkdown2 (= ${binary:Version})
+#Multi-Arch: same
+#Description: implementation of Markdown markup language in C (debug)
+# Discount is an implementation of John Gruber's Markdown markup language. It
+# implements all of the language described in the Markdown syntax document and
+# passes the Markdown 1.0 test suite.
+# .
+# This package provide the debugging symbols for discount.
