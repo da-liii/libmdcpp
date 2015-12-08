@@ -260,8 +260,6 @@ protected:
     virtual void postWrite(std::ostream& out) const override {}
 };
 
-
-
 class EscapedCharacter: public Token {
 public:
     EscapedCharacter(char c): mChar(c) { }

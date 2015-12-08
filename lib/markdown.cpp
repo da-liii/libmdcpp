@@ -662,7 +662,6 @@ void Document::writeTokens(std::ostream& out) {
 
 void Document::_process() {
     if (!mProcessed) {
-        _processFencedBlocks();
         _mergeMultilineHtmlTags();
         _processInlineHtmlAndReferences();
         _processBlocksItems(mTokenContainer);
@@ -689,27 +688,6 @@ optional<TokenPtr> Document::parseFencedCodeBlock(CTokenGroupIter& i, CTokenGrou
         return TokenPtr(new markdown::token::FencedCodeBlock(out.str(), info, mHighlighter));
     }
     return none;
-}
-
-void Document::_processFencedBlocks() {
-    token::Container *tokens=dynamic_cast<token::Container*>(mTokenContainer.get());
-    assert(tokens!=0);
-
-    TokenGroup processed;
-
-    for (auto ii=tokens->subTokens().begin(),
-            iie=tokens->subTokens().end(); ii!=iie; ++ii)
-    {
-        optional<TokenPtr> subitem;
-        subitem=parseFencedCodeBlock(ii, iie);
-
-        if (subitem) {
-            processed.push_back(*subitem);
-            continue;
-        } else
-            processed.push_back(*ii);
-    }
-    tokens->swapSubtokens(processed);
 }
 
 void Document::_mergeMultilineHtmlTags() {
@@ -793,6 +771,12 @@ void Document::_processBlocksItems(TokenPtr inTokenContainer) {
         int status(0);
         optional<TokenPtr> subitem, blockQuoteToken;
         if ((*ii)->text()) {
+            subitem = parseFencedCodeBlock(ii, iie);
+            if (subitem) {
+                processed.push_back(*subitem);
+                continue;
+            }
+            
             isBlockQuote = parseBlockQuote(accu, ii, iie);
             
             if (ii != iie) {
