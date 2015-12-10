@@ -311,25 +311,14 @@ bool isCodeFenceEndLine(const string& line, int indent, int openLen, char fence,
     return true;
 }
 
-size_t countQuoteLevel(const string& prefixString) {
-    size_t r=0;
-    for (auto qi=prefixString.cbegin(),
-            qie=prefixString.cend(); qi!=qie; ++qi)
-        if (*qi=='>') ++r;
-    return r;
-}
-
 bool parseBlockQuote(markdown::TokenGroup& subTokens,CTokenGroupIter& i, CTokenGroupIter end) {
-    static const regex cBlockQuoteExpression("^((?: {0,3}>)+) ?(.*)$");
+    static const regex cBlockQuoteExpression("^( {0,3}> ?)(.*)$");
     // Useful captures: 1=prefix, 2=content
 
     if (!(*i)->isBlankLine() && (*i)->text() && (*i)->canContainMarkup()) {
         const string& line(*(*i)->text());
         smatch m;
         if (regex_match(line, m, cBlockQuoteExpression)) {
-            size_t quoteLevel=countQuoteLevel(m[1]);
-            regex continuationExpression=regex("^((?: {0,3}>){"+boost::lexical_cast<string>(quoteLevel)+"}) ?(.*)$");
-
             if (!isBlankLine(m[2]))
                 subTokens.push_back(TokenPtr(new markdown::token::RawText(m[2])));
             else
@@ -338,7 +327,7 @@ bool parseBlockQuote(markdown::TokenGroup& subTokens,CTokenGroupIter& i, CTokenG
             ++i;
             while (i!=end) {
                 const string& line(*(*i)->text());
-                if (regex_match(line, m, continuationExpression)) {
+                if (regex_match(line, m, cBlockQuoteExpression)) {
                     assert(m[2].matched);
                     if (!isBlankLine(m[2]))
                         subTokens.push_back(TokenPtr(new markdown::token::RawText(m[2])));
