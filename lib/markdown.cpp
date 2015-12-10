@@ -204,15 +204,23 @@ optional<string> isCodeBlockLine(CTokenGroupIter& i, CTokenGroupIter end) {
         }
         --i;
     } else if ((*i)->text() && (*i)->canContainMarkup()) {
-        // Test if the line starts with 4 spaces
-        // tabs behave as if they were replaced by spaces with a tab stop of 4 characters
+        // test if the line starts with 4 spaces
+        // tabs behave as if replaced by spaces with a tab stop of 4 characters
         const string& line(*(*i)->text());
         if (line.length() >= 4) {
-            auto si=line.begin(), sie=si+4;
-            while (si!=sie && *si==' ') ++si;
-            if (si==sie || *si=='\t') {
+            auto si = line.begin(), sie = si+4;
+            int cnt = 0;
+            while (si!=sie && cnt<4) {
+                if (*si==' ')
+                    ++cnt;
+                else if (*si=='\t')
+                    cnt += 4-((*i)->pos()+cnt)%4;
+                else
+                    break;
+                si++;
+            }
+            if (cnt>=4) {
                 ++i;
-                if (si!=sie) ++si;
                 return string(si, line.end());
             }
         }
@@ -320,7 +328,7 @@ bool parseBlockQuote(markdown::TokenGroup& subTokens,CTokenGroupIter& i, CTokenG
         smatch m;
         if (regex_match(line, m, cBlockQuoteExpression)) {
             if (!isBlankLine(m[2]))
-                subTokens.push_back(TokenPtr(new markdown::token::RawText(m[2])));
+                subTokens.push_back(TokenPtr(new markdown::token::RawText(m[2], m[1].length()+(*i)->pos())));
             else
                 subTokens.push_back(TokenPtr(new markdown::token::BlankLine(m[2])));
             
@@ -330,7 +338,7 @@ bool parseBlockQuote(markdown::TokenGroup& subTokens,CTokenGroupIter& i, CTokenG
                 if (regex_match(line, m, cBlockQuoteExpression)) {
                     assert(m[2].matched);
                     if (!isBlankLine(m[2]))
-                        subTokens.push_back(TokenPtr(new markdown::token::RawText(m[2])));
+                        subTokens.push_back(TokenPtr(new markdown::token::RawText(m[2], m[1].length()+(*i)->pos())));
                     else
                         subTokens.push_back(TokenPtr(new markdown::token::BlankLine(m[2])));
                     ++i;

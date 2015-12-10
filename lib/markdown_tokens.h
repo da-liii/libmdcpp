@@ -42,6 +42,9 @@ class Token {
 public:
     Token() { }
 
+    int pos() { return mPos; }
+    int setPos(int pos) { mPos = pos; }
+  
     virtual void writeAsHtml(std::ostream&) const=0;
     virtual void writeAsOriginal(std::ostream& out) const {
         writeAsHtml(out);
@@ -92,6 +95,9 @@ public:
 protected:
     virtual void preWrite(std::ostream& out) const { }
     virtual void postWrite(std::ostream& out) const { }
+
+private:
+    int mPos;
 };
 
 namespace token {
@@ -102,9 +108,10 @@ enum EncodingFlags { cAmps=0x01, cDoubleAmps=0x02, cAngles=0x04, cQuotes=0x08 };
 
 class TextHolder: public Token {
 public:
-    TextHolder(const string& text, bool canContainMarkup, unsigned int
-               encodingFlags): mText(text), mCanContainMarkup(canContainMarkup),
-        mEncodingFlags(encodingFlags) { }
+    TextHolder(const string& text, bool canContainMarkup, unsigned int encodingFlags, int pos=0)
+    : mText(text)
+    , mCanContainMarkup(canContainMarkup)
+    , mEncodingFlags(encodingFlags) { setPos(pos); }
 
     virtual void writeAsHtml(std::ostream& out) const;
 
@@ -128,8 +135,8 @@ private:
 
 class RawText: public TextHolder {
 public:
-    RawText(const string& text, bool canContainMarkup=true):
-        TextHolder(text, canContainMarkup, cAmps|cAngles|cQuotes) { }
+    RawText(const string& text, int pos=0, bool canContainMarkup=true):
+        TextHolder(text, canContainMarkup, cAmps|cAngles|cQuotes, pos) { }
         
     virtual void writeToken(std::ostream& out) const {
         out << "RawText: " << *text() << '\n';
