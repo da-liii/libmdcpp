@@ -191,6 +191,9 @@ optional<TokenPtr> parseInlineHtml(CTokenGroupIter& i, CTokenGroupIter end) {
     return none;
 }
 
+/*
+ * return the code block part or none
+ */
 optional<string> isCodeBlockLine(CTokenGroupIter& i, CTokenGroupIter end) {
     if ((*i)->isBlankLine()) {
         // If we get here, we're already in a code block.
@@ -201,12 +204,15 @@ optional<string> isCodeBlockLine(CTokenGroupIter& i, CTokenGroupIter end) {
         }
         --i;
     } else if ((*i)->text() && (*i)->canContainMarkup()) {
+        // Test if the line starts with 4 spaces
+        // tabs behave as if they were replaced by spaces with a tab stop of 4 characters
         const string& line(*(*i)->text());
-        if (line.length()>=4) {
+        if (line.length() >= 4) {
             auto si=line.begin(), sie=si+4;
             while (si!=sie && *si==' ') ++si;
-            if (si==sie) {
+            if (si==sie || *si=='\t') {
                 ++i;
+                if (si!=sie) ++si;
                 return string(si, line.end());
             }
         }
@@ -618,10 +624,6 @@ bool Document::_getline(std::istream& in, string& line) {
         } else if (c=='\n') {
             if ((in.get(c)) && c!='\r') in.unget();
             return true;
-        } else if (c=='\t') {
-            size_t convert=(initialWhitespace ? cSpacesPerInitialTab :
-                            cSpacesPerTab);
-            line+=string(convert-(line.length()%convert), ' ');
         } else {
             line.push_back(c);
             if (c!=' ') initialWhitespace=false;
