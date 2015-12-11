@@ -373,7 +373,7 @@ optional<TokenPtr> parseListBlock(CTokenGroupIter& i, CTokenGroupIter& end) {
             type = cUnordered;
             char startChar = *m[2].first;
             indent = m[1].length() + m[3].length() + 1;
-            contentTokens.push_back(TokenPtr(new markdown::token::RawText(m[4].str())));
+            contentTokens.push_back(TokenPtr(new markdown::token::RawText(m[4].str(), (*i)->pos()+indent)));
             
             next << "^( {0,3})" << startChar << "( +)(.*)$";
             nextItemExpression = next.str();
@@ -383,7 +383,7 @@ optional<TokenPtr> parseListBlock(CTokenGroupIter& i, CTokenGroupIter& end) {
             type = cOrdered;
             char startChar = *m[3].first;
             indent = m[1].length() + m[2].length() + m[4].length() + 1;
-            contentTokens.push_back(TokenPtr(new markdown::token::RawText(m[5].str())));
+            contentTokens.push_back(TokenPtr(new markdown::token::RawText(m[5].str(), (*i)->pos()+indent)));
             
             next << "^( {0,3}[0-9]+)\\" << startChar << "( +)(.*)$";
             nextItemExpression = next.str();
@@ -407,7 +407,8 @@ optional<TokenPtr> parseListBlock(CTokenGroupIter& i, CTokenGroupIter& end) {
                 ++ii;
                 if (ii == end)
                     break;
-                if ((*ii)->isBlankLine()) { // skip this Blank Line
+                // two blank lines close the <ul>
+                if ((*ii)->isBlankLine()) {
                     ++i;
                     break;
                 }
@@ -420,7 +421,7 @@ optional<TokenPtr> parseListBlock(CTokenGroupIter& i, CTokenGroupIter& end) {
             if (regex_match(line, m, nextContentExpression)) {
                 if (isPrevBlankLine)
                     contentTokens.push_back(TokenPtr(new markdown::token::BlankLine()));
-                contentTokens.push_back(TokenPtr(new markdown::token::RawText(m[1].str())));
+                contentTokens.push_back(TokenPtr(new markdown::token::RawText(m[1].str(), (*i)->pos()+indent)));
                 ++i;
                 // if one of the items directly contains two block-level
                 // elements with a blank line between them, the lists are loose
@@ -431,8 +432,8 @@ optional<TokenPtr> parseListBlock(CTokenGroupIter& i, CTokenGroupIter& end) {
             if (regex_match(line, m, nextItemExpression)) {
                 itemTokens.push_back(TokenPtr(new markdown::token::ListItem(contentTokens)));
                 contentTokens.clear();
-                contentTokens.push_back(TokenPtr(new markdown::token::RawText(m[3].str())));
                 indent = m[1].length() + m[2].length() + 1;
+                contentTokens.push_back(TokenPtr(new markdown::token::RawText(m[3].str(), (*i)->pos()+indent)));
                 next << "^ {" << indent << "}(.*)$";
                 nextContentExpression = next.str();
                 next.str("");
