@@ -8,6 +8,7 @@
 #include "markdown_tokens.h"
 
 #include <stack>
+#include <algorithm>
 #include <unordered_set>
 #include <cctype>
 
@@ -142,7 +143,7 @@ bool looksLikeEmailAddress(const string& str) {
 
 const char *cOtherTagInit[]= {
     // Header tags
-    "title/", "base", "link", "basefont", "script/", "style/",
+    "title/", "link", "script/", "style/",
     "object/", "meta",
 
     // Inline tags
@@ -154,14 +155,15 @@ const char *cOtherTagInit[]= {
     0
 };
 
-const char *cBlockTagInit[]= { "p/", "blockquote/", "hr", "h1/", "h2/",
-                               "h3/", "h4/", "h5/", "h6/", "dl/", "dt/", "dd/", "ol/", "ul/",
-                               "li/", "dir/", "menu/", "table/", "tr/", "th/", "td/", "col",
-                               "colgroup/", "caption/", "thead/", "tbody/", "tfoot/", "form/",
-                               "select/", "option", "input", "label/", "textarea/", "div/", "pre/",
-                               "address/", "iframe/", "frame/", "frameset/", "noframes/",
-                               "center/", "b/", "i/", "big/", "small/", /*"s/",*/ "strike/", "tt/",
-                               "u/", "font/", "ins/", "del/", 0
+const char *cBlockTagInit[]= { "address/", "article/", "aside/", "base", "basefont", "blockquote/",
+                               "body/", "caption/", "center/", "col", "colgroup/", "dd/", "details",
+                               "dir/", "div/", "dl/", "dt/", "fieldset/", "figcaption", "figure",
+                               "footer", "form/", "frame/", "frameset/", "h1/", "h2/", "h3/", "h4/",
+                               "h5/", "h6/", "ul/", "head", "header", "hr", "html/", "iframe/",
+                               "legend", "li/", "link", "main/", "menu/", "menuitem", "meta", "nav",
+                               "noframes/", "ol/", "optgroup", "option", "p/", "param", "section",
+                               "source", "summary", "table/", "tbody/", "tr/", "th/", "td/", "thead/",
+                               "tfoot/", "title", "track", "ul/"
                              };
 
 // Other official ones (not presently in use in this code)
@@ -203,12 +205,14 @@ size_t isValidTag(const string& tag, bool nonBlockFirst) {
         initTag(blockTags, cBlockTagInit);
     }
 
+    string TAG(tag);
+    transform(TAG.begin(), TAG.end(), TAG.begin(), tolower);
     if (nonBlockFirst) {
-        if (otherTags.find(tag)!=otherTags.end()) return 1;
-        if (blockTags.find(tag)!=blockTags.end()) return 2;
+        if (otherTags.find(TAG)!=otherTags.end()) return 1;
+        if (blockTags.find(TAG)!=blockTags.end()) return 2;
     } else {
-        if (blockTags.find(tag)!=blockTags.end()) return 2;
-        if (otherTags.find(tag)!=otherTags.end()) return 1;
+        if (blockTags.find(TAG)!=blockTags.end()) return 2;
+        if (otherTags.find(TAG)!=otherTags.end()) return 1;
     }
     return 0;
 }

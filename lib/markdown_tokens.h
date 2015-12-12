@@ -108,7 +108,7 @@ enum EncodingFlags { cAmps=0x01, cDoubleAmps=0x02, cAngles=0x04, cQuotes=0x08 };
 
 class TextHolder: public Token {
 public:
-    TextHolder(const string& text, bool canContainMarkup, unsigned int encodingFlags, size_t pos=0)
+    TextHolder(const string& text, bool canContainMarkup, unsigned int encodingFlags=0, size_t pos=0)
     : mText(text)
     , mCanContainMarkup(canContainMarkup)
     , mEncodingFlags(encodingFlags) { setPos(pos); }
