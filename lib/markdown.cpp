@@ -51,9 +51,9 @@ optional<HtmlTagInfo> parseHtmlTag(string::const_iterator begin,
     {
         HtmlTagInfo r;
         r.tagName=m[3];
-        if (m[4].matched) r.extra=m[4];
-        r.isClosingTag=(m[2].length()>0);
-        r.lengthOfToken=m[0].length();
+        if (m[4].matched) r.extra = m[4];
+        r.isClosingTag = (m[2].length()>0);
+        r.lengthOfToken = m[0].length();
         return r;
     }
     return none;
@@ -112,40 +112,41 @@ optional<TokenPtr> parseInlineHtml(CTokenGroupIter& i, CTokenGroupIter end) {
     if ((*i)->text()) {
         const string& line(*(*i)->text());
 
-        bool tag=false, comment=false;
-        optional<HtmlTagInfo> tagInfo=parseHtmlTag(line.cbegin(), line.cend(), cStarts);
-        if (tagInfo && markdown::token::isValidTag(tagInfo->tagName)>1) {
-            tag=true;
+        bool tag = false, comment = false;
+        optional<HtmlTagInfo> tagInfo = parseHtmlTag(line.cbegin(), line.cend(), cStarts);
+        if (tagInfo && markdown::token::isValidTag(tagInfo->tagName)>0) {
+            tag = true;
         } else if (isHtmlCommentStart(line.begin(), line.end())) {
-            comment=true;
+            comment = true;
         }
 
         if (tag) {
             // Block continues until an HTML tag (alone) on a line followed by a
             // blank line.
             markdown::TokenGroup contents;
-            auto firstLine=i, prevLine=i;
-            size_t lines=0;
+            auto firstLine = i, prevLine = i;
+            size_t lines = 0;
 
             bool done=false;
             do {
                 // We encode HTML tags so that their contents gets properly
                 // handled -- i.e. "<div style=">"/>" becomes <div style="&gt;"/>
                 if ((*i)->text()) {
-                    markdown::TokenGroup t=parseInlineHtmlText(*(*i)->text());
+                    markdown::TokenGroup t = parseInlineHtmlText(*(*i)->text());
                     contents.splice(contents.end(), t);
                 } else contents.push_back(*i);
 
-                prevLine=i;
+                prevLine = i;
                 ++i;
                 ++lines;
 
                 if (i!=end && (*i)->isBlankLine() && (*prevLine)->text()) {
-                    if (prevLine==firstLine) {
+                    if (prevLine == firstLine) {
                         done=true;
                     } else {
                         const string& text(*(*prevLine)->text());
-                        if (parseHtmlTag(text.cbegin(), text.cend(), cAlone)) done=true;
+                        if (parseHtmlTag(text.cbegin(), text.cend(), cAlone))
+                            done=true;
                     }
                 }
             } while (i!=end && !done);
@@ -156,7 +157,7 @@ optional<TokenPtr> parseInlineHtml(CTokenGroupIter& i, CTokenGroupIter end) {
             } else {
                 // Single-line HTML "blocks" whose initial tags are span-tags
                 // don't qualify as inline HTML.
-                i=firstLine;
+                i = firstLine;
                 return none;
             }
         } else if (comment) {
@@ -729,7 +730,7 @@ void Document::_processInlineHtmlAndReferences() {
     {
         if ((*ii)->text()) {
             if (processed.empty() || processed.back()->isBlankLine()) {
-                optional<TokenPtr> inlineHtml=parseInlineHtml(ii, iie);
+                optional<TokenPtr> inlineHtml = parseInlineHtml(ii, iie);
                 if (inlineHtml) {
                     processed.push_back(*inlineHtml);
                     if (ii==iie) break;
