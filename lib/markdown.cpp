@@ -375,7 +375,7 @@ optional<TokenPtr> parseListBlock(CTokenGroupIter& i, CTokenGroupIter& end) {
             indent = m[1].length() + m[3].length() + 1;
             contentTokens.push_back(TokenPtr(new markdown::token::RawText(m[4].str(), (*i)->pos()+indent)));
             
-            next << "^( {0,3})" << startChar << "( +)(.*)$";
+            next << "^( {0,3})\\" << startChar << "( +)(.*)$";
             nextItemExpression = next.str();
             next.str("");
             next.clear();
