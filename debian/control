@@ -1,7 +1,7 @@
 Source: libmdcpp
 Priority: optional
 Maintainer: Darcy Shen <sadhen@zoho.com>
-Build-Depends: debhelper (>= 9), cmake
+Build-Depends: debhelper (>= 9), cmake, libboost-regex-dev, libboost-dev
 Standards-Version: 3.9.6
 Section: libs
 Homepage: https://github.com/sadhen/libmdcpp
