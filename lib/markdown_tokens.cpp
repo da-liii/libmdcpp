@@ -379,7 +379,7 @@ string RawText::_processLinksImagesAndTags(const string &src,
     //   "|(?:(!?)\\[(.+?)\\](?: *\\[(.*?)\\])?)"
     //
     static const regex cExpression(
-        "(?:(!?)\\[([^\\]]+?)\\] *\\(([^\\(]*(?:\\(.*?\\).*?)*?)\\))" // Inline link or image
+        "(?:(!?)\\[(.*)\\]\\(([^\\(]*(?:\\(.*?\\).*?)*?)\\))" // Inline link or image
         "|(?:(!?)\\[((?:[^]]*?\\[.*?\\].*?)|(?:.+?))\\](?: *\\[(.*?)\\])?)" // Reference link or image
         "|(?:<(/?([a-zA-Z0-9]+).*?)>)" // potential HTML tag or auto-link
     );
