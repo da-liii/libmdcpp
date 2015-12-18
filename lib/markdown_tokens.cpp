@@ -21,6 +21,7 @@ using boost::regex;
 using boost::smatch;
 using boost::regex_search;
 using boost::regex_match;
+using boost::lexical_cast;
 using std::unordered_set;
 using std::isalnum;
 
@@ -484,57 +485,87 @@ string RawText::_processLinksImagesAndTags(const string &src,
 TokenGroup RawText::_processBoldAndItalicSpans(const string& src,
         ReplacementTable& replacements)
 {
-    static const regex cEmphasisExpression(
-        "((?:(?<= |[[:punct:]])\\*{1,3}(?! |$))|"                            // Open
+    /*
+     * not followed by Unicode whitespace, and (b) either not
+     * followed by a punctuation character, or preceded by Unicode
+     * whitespace or a punctuation character.
+     */
+    static const regex cLeftFlankingExpression(
+        "((?:(?:^|(?<= |[[:punct:]]))\\*{1,3}(?! |$))|"
         "(?:\\*{1,3}(?! |$|[[:punct:]])))|"
-        "((?:_{1,3}(?! |$|[[:punct:]]))|"
-        "(?:(?<![[:punct:]])(?<= )_{1,3}(?! |$)(?![[:punct:]])))|"                                  
-        "((?:(?<! )\\*{1,3}(?=$| |[[:punct:]]))|"                                 // Close
-        "(?:(?<! |[[:punct:]])\\*{1,3}))|"
-        "((?<! |[[:punct:]])_{1,3}|"
-        "(?<! )(?<=[[:punct:]])_{1,3}(?= |$)(?![[:punct:]]))"
+        "((?:(?:^|(?<= |[[:punct:]]))_{1,3}(?! |$))|"                                  
+        "(?:_{1,3}(?! |$|[[:punct:]])))"
     );
+        
 
     TokenGroup tgt;
     auto i = src.cbegin(), end = src.cend(), prev = i;
+    bool lastLeft = false;
+    string lastToken;
 
     while (true) {
         smatch m;
-        if (regex_search(prev, end, m, cEmphasisExpression)) {
+        
+        if (lastLeft) {
+            string rightRegex;
+            if (lastToken[0] == '*')
+                rightRegex = "((?:(?<! )\\*{" + lexical_cast<string>(lastToken.length()) + "}(?=$| |[[:punct:]]))|"
+                + "(?:(?<! |[[:punct:]])\\*{" + lexical_cast<string>(lastToken.length()) + "}))";
+            else
+                rightRegex =  "((?:(?<! |[[:punct:]])_{" + lexical_cast<string>(lastToken.length()) + "})|"
+                + "(?:(?<! )_{" + lexical_cast<string>(lastToken.length()) + "}(?=$| |[[:punct:]])))";
+            const regex cRightFlankingExpression(rightRegex);
+                                
+            if (regex_search(prev, end, m, cRightFlankingExpression)) {
+                lastLeft = false;
+                if (prev != m[0].first)
+                    tgt.push_back(TokenPtr(new RawText(string(prev, m[0].first))));
+                
+                string token;
+                if (m[1].matched) {
+                    token = m[1];
+                    if (token[0]=='_' && m[0].first != i && m[0].second != end
+                        && isalnum(*(m[0].first-1)) && isalnum(*m[0].second)) {
+                        tgt.push_back(TokenPtr(new RawText(token)));
+                        lastLeft = true;
+                    } else
+                        tgt.push_back(TokenPtr(new BoldOrItalicMarker(false, token[0],
+                                                token.length())));
+                } 
+                prev = m[0].second;
+                continue;
+            }
+        }
+        
+        if (regex_search(prev, end, m, cLeftFlankingExpression)) {
+            lastLeft = true;
             if (prev != m[0].first)
                 tgt.push_back(TokenPtr(new RawText(string(prev, m[0].first))));
             
-            if (m[1].matched) {
-                string token = m[1];
+            string token;
+            if (m[1].matched) { // for *
+                token = m[1];
                 tgt.push_back(TokenPtr(new BoldOrItalicMarker(true, token[0],
                                        token.length())));
-            } else if (m[2].matched) {
-                string token = m[2];
+            } else if (m[2].matched) { // for -
+                token = m[2];
                 if (m[0].first != i && m[0].second != end &&
-                    isalnum(*(m[0].first-1)) && isalnum(*m[0].second))
+                    isalnum(*(m[0].first-1)) && isalnum(*m[0].second)) {
                     tgt.push_back(TokenPtr(new RawText(token)));
-                else
+                    lastLeft = false;
+                } else
                     tgt.push_back(TokenPtr(new BoldOrItalicMarker(true, token[0],
                                             token.length())));
-            } else if (m[3].matched) {
-                string token = m[3];
-                tgt.push_back(TokenPtr(new BoldOrItalicMarker(false, token[0],
-                                       token.length())));
-            } else if (m[4].matched) {
-                string token = m[4];
-                if (m[0].first != i && m[0].second != end &&
-                    isalnum(*(m[0].first-1)) && isalnum(*m[0].second))
-                    tgt.push_back(TokenPtr(new RawText(token)));
-                else
-                    tgt.push_back(TokenPtr(new BoldOrItalicMarker(false, token[0],
-                                            token.length())));
-            }
+            } 
+            
+            lastToken = token;
             prev = m[0].second;
-        } else {
-            if (prev != end)
-                tgt.push_back(TokenPtr(new RawText(string(prev, end))));
-            break;
+            continue;
         }
+            
+        if (prev != end)
+            tgt.push_back(TokenPtr(new RawText(string(prev, end))));
+        break;
     }
 
     int id=0;
@@ -544,6 +575,9 @@ TokenGroup RawText::_processBoldAndItalicSpans(const string& src,
 
             // Find a matching close-marker, if it's there
             auto iii=ii;
+            ++iii;
+            if (iii == iie)
+                break;
             for (++iii; iii!=iie; ++iii) {
                 if ((*iii)->isUnmatchedCloseMarker()) {
                     BoldOrItalicMarker *closeToken=dynamic_cast<BoldOrItalicMarker*>(iii->get());
@@ -586,9 +620,9 @@ TokenGroup RawText::_processBoldAndItalicSpans(const string& src,
                         break;
                     }
                 }
-            }
+            } // end of inner for
         }
-    }
+    } // end of outer for
 
     // "Unmatch" invalidly-nested matches.
     std::stack<BoldOrItalicMarker*> openMatches;
@@ -787,8 +821,7 @@ void Paragraph::writeAsHtml(std::ostream& out) const {
     for (auto i=mSubTokens.cbegin(), ie=mSubTokens.cend(); i!=ie;) {
         (*i)->writeAsHtml(out);
         ++i;
-        if (i!=ie && ((*i)->isRawText() || (*i)->isUnmatchedOpenMarker() 
-            || (*i)->isUnmatchedCloseMarker()))
+        if (i!=ie)
             out << "\n";
     }
     postWrite(out);
