@@ -162,7 +162,7 @@ const char *cBlockTagInit[]= { "address/", "article/", "aside/", "base", "basefo
                                "footer", "form/", "frame/", "frameset/", "h1/", "h2/", "h3/", "h4/",
                                "h5/", "h6/", "ul/", "head", "header", "hr", "html/", "iframe/",
                                "legend", "li/", "link", "main/", "menu/", "menuitem", "meta", "nav",
-                               "noframes/", "ol/", "optgroup", "option", "p/", "param", "section",
+                               "noframes/", "ol/", "optgroup", "option", "p/", "param", "ruby", "rt", "section",
                                "source", "summary", "table/", "tbody/", "tr/", "th/", "td/", "thead/",
                                "tfoot/", "title", "track", "ul/"
                              };
