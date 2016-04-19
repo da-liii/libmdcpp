@@ -12,12 +12,12 @@ Procesoro::Procesoro(SyntaxHighlighter *highlighter, const string type)
   
 bool Procesoro::read(const string& aString)
 {
-    mDocument->read(aString);
+    return mDocument->read(aString);
 }
 
 bool Procesoro::read(std::istream& aIstream)
 {
-    mDocument->read(aIstream);
+    return mDocument->read(aIstream);
 }
 
 void Procesoro::write(std::ostream& aOstream)

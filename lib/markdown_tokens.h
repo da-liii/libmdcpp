@@ -43,7 +43,7 @@ public:
     Token() { }
 
     int pos() { return mPos; }
-    int setPos(int pos) { mPos = pos; }
+    void setPos(int pos) { mPos = pos; }
   
     virtual void writeAsHtml(std::ostream&) const=0;
     virtual void writeAsOriginal(std::ostream& out) const {
