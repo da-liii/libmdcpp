@@ -2,3 +2,7 @@ build/
 .kdev4/
 *.kdev4
 *~
+obj-x86_64-linux-gnu/
+debian/.debhelper/
+debian/*.log
+debian/*.substvars

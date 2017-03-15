@@ -6,7 +6,7 @@ SET_TARGET_PROPERTIES(mdcppshared PROPERTIES OUTPUT_NAME "mdcpp")
 
 target_link_libraries(mdcppshared ${Boost_LIBRARIES})
 
-set_target_properties(mdcppshared PROPERTIES VERSION 0.2 SOVERSION 1)
+set_target_properties(mdcppshared PROPERTIES VERSION 0.2.0 SOVERSION 0)
 
 install(TARGETS mdcppshared ARCHIVE DESTINATION ${LIB_INSTALL_DIR} LIBRARY DESTINATION ${LIB_INSTALL_DIR})
 
