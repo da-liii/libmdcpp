@@ -4,7 +4,7 @@ A markdown implementation forked from [cpp-markdown](http://sourceforge.net/proj
 
 It is intended for [marketo](https://github.com/sadhen/marketo).
 
-**Note**: The implementation won't 100% support CommonMark, but aims to pass the most significant test case. If you find an important test case libmdcpp hasn't pass, please tell me in the issues.
+**Note**: The implementation won't 100% support CommonMark, but aims to pass the most significant test case. If you find an important test case libmdcpp hasn't pass or a case that would make it crash, please tell me in the issues.
 
 ## Install
 First of all, you need to install the dependencies. In **Debian Sid**, just
