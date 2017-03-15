@@ -22,4 +22,4 @@ find_package(Boost
 include_directories(${Boost_INCLUDE_DIRS})
 
 add_subdirectory(lib)
-# add_subdirectory(test)
+add_subdirectory(test)
